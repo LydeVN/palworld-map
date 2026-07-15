@@ -4,127 +4,71 @@ import L from 'leaflet';
 import { API_CONFIG } from '../config';
 import 'leaflet/dist/leaflet.css';
 
+// Fix robuste pour les marqueurs Leaflet en production (Vite)
+const DefaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
 const MAP_WIDTH = 2048;
 const MAP_HEIGHT = 2048;
 const bounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
-
-// Cache pour éviter de spammer l'API Twitch pour les mêmes joueurs
-const twitchAvatarCache = {};
 
 export default function PalworldMap() {
   const [players, setPlayers] = useState([]);
   const [connected, setConnected] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [avatars, setAvatars] = useState({});
-  
-  // Instance de la carte pour pouvoir la contrôler (recentrer, zoomer)
-  const [map, setMap] = useState(null);
-
-  // Récupération de l'avatar Twitch pour un joueur donné
-  const fetchTwitchAvatar = async (username) => {
-    if (twitchAvatarCache[username]) {
-      return twitchAvatarCache[username];
-    }
-
-    try {
-      if (API_CONFIG.TWITCH_CLIENT_ID && API_CONFIG.TWITCH_OAUTH_TOKEN) {
-        const response = await fetch(`https://api.twitch.tv/helix/users?login=${username.toLowerCase()}`, {
-          headers: {
-            'Client-ID': API_CONFIG.TWITCH_CLIENT_ID,
-            'Authorization': `Bearer ${API_CONFIG.TWITCH_OAUTH_TOKEN}`
-          }
-        });
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-          const url = data.data[0].profile_image_url;
-          twitchAvatarCache[username] = url;
-          return url;
-        }
-      }
-    } catch (err) {
-      console.error("Erreur lors de la récupération de l'avatar Twitch pour", username, err);
-    }
-
-    const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=f59e0b&color=0f172a&bold=true&rounded=true`;
-    twitchAvatarCache[username] = fallback;
-    return fallback;
-  };
-
-  // Charger les avatars quand la liste des joueurs change
-  useEffect(() => {
-    players.forEach(async (player) => {
-      if (player.avatar_url) {
-        setAvatars(prev => ({ ...prev, [player.userId]: player.avatar_url }));
-        return;
-      }
-      if (!avatars[player.userId]) {
-        const url = await fetchTwitchAvatar(player.name);
-        setAvatars(prev => ({ ...prev, [player.userId]: url }));
-      }
-    });
-  }, [players]);
 
   // Conversion calibrée : gère les inversions et l'échelle réelle de Palworld
   const gameToMap = (gameX, gameY) => {
+    // 1. Bornes réelles de la carte Palworld en Unreal Units
+    // Ces valeurs définissent la "fenêtre" de jeu visible sur ton image palpagos.webp
     const minX = -1024000;
     const maxX = 1024000;
     const minY = -1024000;
     const maxY = 1024000;
 
+    // 2. Calcul du pourcentage brut sur chaque axe
     let percentX = (gameX - minX) / (maxX - minX);
     let percentY = (gameY - minY) / (maxY - minY);
+
+    // 3. CALIBRATION ET CORRECTION DES AXES
+    // Palworld utilise un système d'axes qui nécessite souvent d'associer
+    // le X du jeu au Y de l'écran, ou d'inverser un axe.
+    // D'après tes symptômes (aller à gauche te fait monter) :
+    // On inverse les axes pour que le déplacement latéral influe sur l'axe horizontal.
     
+    // Échange des axes pour corriger la rotation de 90° :
     const temp = percentX;
     percentX = percentY;
     percentY = temp;
 
+    // Ajustements fins d'échelle pour que tout le monde reste dans le cadre
     const scaleX = 1.42; 
     const scaleY = 1.42;
 
-    const offsetX = -0.21;
-    const offsetY = 0.05;
+    // Ajustements de décalage (Offsets) pour centrer parfaitement
+    const offsetX = -0.21; // Décale vers la gauche/droite (- pour gauche, + pour droite)
+    const offsetY = 0.05; // Décale vers le haut/bas (- pour bas, + pour haut)
 
+    // Application des coefficients
     percentX = (percentX * scaleX) + offsetX;
     percentY = (percentY * scaleY) + offsetY;
 
+    // Bornage de sécurité (évite que l'icône sorte des limites 0% - 100%)
     percentX = Math.max(0, Math.min(1, percentX));
     percentY = Math.max(0, Math.min(1, percentY));
 
+    // 4. Conversion finale en pixels Leaflet (Y inversé car le point [0,0] est en bas à gauche pour Leaflet Simple CRS)
     const x = percentX * MAP_WIDTH;
     const y = percentY * MAP_HEIGHT; 
 
     return [y, x];
-  };
-
-  // Fonction pour recentrer la carte sur un joueur spécifique
-  const focusOnPlayer = (player) => {
-    if (map) {
-      const position = gameToMap(player.location_x, player.location_y);
-      // Change la position et applique un niveau de zoom confortable (ex: 1)
-      map.setView(position, 1, { animate: true, duration: 1 });
-    }
-  };
-
-  // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
-  const createTwitchIcon = (username, userId) => {
-    const avatarUrl = avatars[userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=f59e0b&color=0f172a&bold=true`;
-    
-    return L.divIcon({
-      className: 'custom-twitch-marker',
-      html: `
-        <div class="relative group flex items-center justify-center">
-          <div class="absolute inset-0 rounded-full bg-amber-500/40 animate-ping opacity-75"></div>
-          <div class="w-10 h-10 rounded-full border-2 border-amber-500 bg-[#0f172a] p-0.5 overflow-hidden shadow-lg shadow-black/80 relative z-10 transition-transform duration-200 group-hover:scale-110">
-            <img src="${avatarUrl}" alt="${username}" class="w-full h-full rounded-full object-cover" />
-          </div>
-          <div class="w-3.5 h-3.5 bg-amber-500 rotate-45 absolute -bottom-1 z-0 rounded-sm shadow-md"></div>
-        </div>
-      `,
-      iconSize: [40, 40],
-      iconAnchor: [20, 40],
-      popupAnchor: [0, -42]
-    });
   };
 
   useEffect(() => {
@@ -217,25 +161,17 @@ export default function PalworldMap() {
                   filteredPlayers.map((player) => (
                     <div 
                       key={player.userId}
-                      onClick={() => focusOnPlayer(player)}
-                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group cursor-pointer"
+                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group"
                     >
-                      <div className="flex justify-between items-start mb-1 flex-nowrap gap-2">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <img 
-                            src={avatars[player.userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=f59e0b&color=0f172a&bold=true`} 
-                            alt="" 
-                            className="w-6 h-6 rounded-full border border-amber-500/50 object-cover flex-shrink-0"
-                          />
-                          <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors truncate">
-                            {player.name}
-                          </span>
-                        </div>
-                        <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 self-center">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors">
+                          {player.name}
+                        </span>
+                        <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
                           LVL {player.level}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-1">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
                         <span>X: {Math.round(player.location_x)} | Y: {Math.round(player.location_y)}</span>
                         {player.ping !== undefined && (
                           <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
@@ -252,7 +188,6 @@ export default function PalworldMap() {
         {/* CONTAINER DE LA CARTE INTEGRÉE */}
         <div className="flex-1 h-full relative bg-[#090d16]">
           <MapContainer
-            ref={setMap} // Stocke l'instance de la carte dans l'état "map"
             crs={L.CRS.Simple}
             bounds={bounds}
             maxZoom={2}
@@ -278,18 +213,13 @@ export default function PalworldMap() {
 
             {players.map((player) => {
               const position = gameToMap(player.location_x, player.location_y);
-              const customIcon = createTwitchIcon(player.name, player.userId);
-              
               return (
-                <Marker key={player.userId} position={position} icon={customIcon}>
+                <Marker key={player.userId} position={position}>
                   <Popup className="custom-popup">
                     <div className="text-slate-100 bg-[#0f172a] border border-slate-800 p-2 rounded-lg shadow-xl font-sans min-w-[140px]">
-                      <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <img src={avatars[player.userId]} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          <strong className="text-sm font-bold text-amber-500">{player.name}</strong>
-                        </div>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1 rounded flex-shrink-0">Lv.{player.level}</span>
+                      <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center">
+                        <strong className="text-sm font-bold text-amber-500">{player.name}</strong>
+                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1 rounded">Lv.{player.level}</span>
                       </div>
                       <div className="text-[10px] font-mono text-slate-400 space-y-0.5">
                         <div className="flex justify-between">
@@ -316,11 +246,6 @@ export default function PalworldMap() {
       <style>{`
         .leaflet-container {
           background: #090d16 !important;
-        }
-        /* Style des conteneurs personnalisés d'icônes Leaflet */
-        .custom-twitch-marker {
-          background: none !important;
-          border: none !important;
         }
         /* Rendre les popups Leaflet entièrement transparentes et sombres */
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
