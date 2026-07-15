@@ -24,13 +24,19 @@ export default function PalworldMap() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Conversion des coordonnées du jeu -> pixels sur la carte
+  // Conversion des coordonnées réelles Unreal Engine -> pixels sur la carte 2048x2048
   const gameToMap = (gameX, gameY) => {
-    const percentX = (gameX + 1000) / 2000; 
-    const percentY = (gameY + 1000) / 2000;
+    // Échelle de la carte du jeu (environ -1024000 à 1024000)
+    const minCoord = -1024000;
+    const maxCoord = 1024000;
+    const range = maxCoord - minCoord; // 2048000
+
+    const percentX = (gameX - minCoord) / range;
+    const percentY = (gameY - minCoord) / range;
+
     const x = percentX * MAP_WIDTH;
     const y = (1 - percentY) * MAP_HEIGHT; 
-    console.log(`Coordonnées jeu: (${gameX}, ${gameY}) -> Pixels carte: [Y: ${y}, X: ${x}]`);
+
     return [y, x];
   };
 
