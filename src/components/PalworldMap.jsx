@@ -24,31 +24,49 @@ export default function PalworldMap() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Conversion des coordonnées réelles Unreal Engine -> pixels sur la carte 2048x2048
+  // Conversion calibrée : gère les inversions et l'échelle réelle de Palworld
   const gameToMap = (gameX, gameY) => {
-    // 1. Échelle brute de l'Unreal Engine (ne pas toucher)
-    const minCoord = -1024000;
-    const maxCoord = 1024000;
-    const range = maxCoord - minCoord;
+    // 1. Bornes réelles de la carte Palworld en Unreal Units
+    // Ces valeurs définissent la "fenêtre" de jeu visible sur ton image palpagos.webp
+    const minX = -1024000;
+    const maxX = 1024000;
+    const minY = -1024000;
+    const maxY = 1024000;
 
-    let percentX = (gameX - minCoord) / range;
-    let percentY = (gameY - minCoord) / range;
+    // 2. Calcul du pourcentage brut sur chaque axe
+    let percentX = (gameX - minX) / (maxX - minX);
+    let percentY = (gameY - minY) / (maxY - minY);
 
-    // 2. VARIABLES DE CALIBRATION (Modifie ces valeurs pour régler la position)
-    // Si le joueur est trop haut, on doit diminuer son Y sur la carte.
-    const offsetY = 0.529;  // Décale vers le bas (ex: -0.05 = -5% de la hauteur de la carte)
-    const offsetX = 0.091;   // Décale vers la droite/gauche si besoin
+    // 3. CALIBRATION ET CORRECTION DES AXES
+    // Palworld utilise un système d'axes qui nécessite souvent d'associer
+    // le X du jeu au Y de l'écran, ou d'inverser un axe.
+    // D'après tes symptômes (aller à gauche te fait monter) :
+    // On inverse les axes pour que le déplacement latéral influe sur l'axe horizontal.
+    
+    // Échange des axes pour corriger la rotation de 90° :
+    const temp = percentX;
+    percentX = percentY;
+    percentY = temp;
 
-    const scaleY = 1.00;    // Multiplicateur d'échelle verticale (ex: 0.95 pour rétrécir l'écart)
-    const scaleX = 1.00;    // Multiplicateur d'échelle horizontale
+    // Ajustements fins d'échelle pour que tout le monde reste dans le cadre
+    const scaleX = 1.42; 
+    const scaleY = 1.42;
 
-    // Application de la calibration
+    // Ajustements de décalage (Offsets) pour centrer parfaitement
+    const offsetX = -0.21; // Décale vers la gauche/droite (- pour gauche, + pour droite)
+    const offsetY = 0.05; // Décale vers le haut/bas (- pour bas, + pour haut)
+
+    // Application des coefficients
     percentX = (percentX * scaleX) + offsetX;
     percentY = (percentY * scaleY) + offsetY;
 
-    // 3. Conversion finale en pixels (2048x2048)
+    // Bornage de sécurité (évite que l'icône sorte des limites 0% - 100%)
+    percentX = Math.max(0, Math.min(1, percentX));
+    percentY = Math.max(0, Math.min(1, percentY));
+
+    // 4. Conversion finale en pixels Leaflet (Y inversé car le point [0,0] est en bas à gauche pour Leaflet Simple CRS)
     const x = percentX * MAP_WIDTH;
-    const y = (1 - percentY) * MAP_HEIGHT; 
+    const y = percentY * MAP_HEIGHT; 
 
     return [y, x];
   };
