@@ -17,6 +17,9 @@ export default function PalworldMap() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [avatars, setAvatars] = useState({});
+  
+  // Instance de la carte pour pouvoir la contrôler (recentrer, zoomer)
+  const [map, setMap] = useState(null);
 
   // Récupération de l'avatar Twitch pour un joueur donné
   const fetchTwitchAvatar = async (username) => {
@@ -25,7 +28,6 @@ export default function PalworldMap() {
     }
 
     try {
-      // Si tu as configuré les identifiants Twitch dans ta config
       if (API_CONFIG.TWITCH_CLIENT_ID && API_CONFIG.TWITCH_OAUTH_TOKEN) {
         const response = await fetch(`https://api.twitch.tv/helix/users?login=${username.toLowerCase()}`, {
           headers: {
@@ -44,8 +46,6 @@ export default function PalworldMap() {
       console.error("Erreur lors de la récupération de l'avatar Twitch pour", username, err);
     }
 
-    // Avatar de secours par défaut si Twitch échoue ou n'est pas configuré
-    // (Utilise un avatar sympa basé sur l'initiale du joueur)
     const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=f59e0b&color=0f172a&bold=true&rounded=true`;
     twitchAvatarCache[username] = fallback;
     return fallback;
@@ -54,12 +54,10 @@ export default function PalworldMap() {
   // Charger les avatars quand la liste des joueurs change
   useEffect(() => {
     players.forEach(async (player) => {
-      // Si le backend envoie déjà l'avatar, on l'utilise
       if (player.avatar_url) {
         setAvatars(prev => ({ ...prev, [player.userId]: player.avatar_url }));
         return;
       }
-      // Sinon, on interroge l'API Twitch (en supposant que player.name = pseudo Twitch)
       if (!avatars[player.userId]) {
         const url = await fetchTwitchAvatar(player.name);
         setAvatars(prev => ({ ...prev, [player.userId]: url }));
@@ -77,24 +75,19 @@ export default function PalworldMap() {
     let percentX = (gameX - minX) / (maxX - minX);
     let percentY = (gameY - minY) / (maxY - minY);
     
-    // Échange des axes pour corriger la rotation de 90° :
     const temp = percentX;
     percentX = percentY;
     percentY = temp;
 
-    // Ajustements fins d'échelle pour que tout le monde reste dans le cadre
     const scaleX = 1.42; 
     const scaleY = 1.42;
 
-    // Ajustements de décalage (Offsets) pour centrer parfaitement
     const offsetX = -0.21;
     const offsetY = 0.05;
 
-    // Application des coefficients
     percentX = (percentX * scaleX) + offsetX;
     percentY = (percentY * scaleY) + offsetY;
 
-    // Bornage de sécurité
     percentX = Math.max(0, Math.min(1, percentX));
     percentY = Math.max(0, Math.min(1, percentY));
 
@@ -102,6 +95,15 @@ export default function PalworldMap() {
     const y = percentY * MAP_HEIGHT; 
 
     return [y, x];
+  };
+
+  // Fonction pour recentrer la carte sur un joueur spécifique
+  const focusOnPlayer = (player) => {
+    if (map) {
+      const position = gameToMap(player.location_x, player.location_y);
+      // Change la position et applique un niveau de zoom confortable (ex: 1)
+      map.setView(position, 1, { animate: true, duration: 1 });
+    }
   };
 
   // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
@@ -120,7 +122,7 @@ export default function PalworldMap() {
         </div>
       `,
       iconSize: [40, 40],
-      iconAnchor: [20, 40], // Centre l'icône horizontalement, et l'ancre par le bas
+      iconAnchor: [20, 40],
       popupAnchor: [0, -42]
     });
   };
@@ -215,7 +217,8 @@ export default function PalworldMap() {
                   filteredPlayers.map((player) => (
                     <div 
                       key={player.userId}
-                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group"
+                      onClick={() => focusOnPlayer(player)}
+                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group cursor-pointer"
                     >
                       <div className="flex justify-between items-start mb-1 flex-nowrap gap-2">
                         <div className="flex items-center gap-2 overflow-hidden">
@@ -249,6 +252,7 @@ export default function PalworldMap() {
         {/* CONTAINER DE LA CARTE INTEGRÉE */}
         <div className="flex-1 h-full relative bg-[#090d16]">
           <MapContainer
+            ref={setMap} // Stocke l'instance de la carte dans l'état "map"
             crs={L.CRS.Simple}
             bounds={bounds}
             maxZoom={2}
