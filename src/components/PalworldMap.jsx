@@ -50,12 +50,12 @@ export default function PalworldMap() {
     return fallback;
   };
 
-  // Charger les avatars quand la liste des joueurs change (sécurisé)
+  // Charger les avatars quand la liste des joueurs change
   useEffect(() => {
     players.forEach(async (player) => {
       if (!player) return;
       const pId = player.userId || player.player_uid || "unknown";
-      const pName = player.name || player.player_name || "Aventurier";
+      const pName = player.name || player.player_name || player.nickname || "Aventurier";
 
       if (player.avatar_url) {
         setAvatars(prev => ({ ...prev, [pId]: player.avatar_url }));
@@ -100,7 +100,7 @@ export default function PalworldMap() {
     return [y, x];
   };
 
-  // Création d'une icône Leaflet personnalisée avec l'avatar Twitch (sécurisé)
+  // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
   const createTwitchIcon = (username, userId) => {
     const pName = username || "Aventurier";
     const pId = userId || "unknown";
@@ -134,14 +134,16 @@ export default function PalworldMap() {
           setPlayers(data.players || []);
         }
       } catch (err) {
-        console.error("Erreur parsing WebSocket message:", err);
+        console.error("Erreur de parsing WebSocket:", err);
       }
     };
     return () => ws.close();
   }, []);
 
-  // 🛡️ Filtre blindé contre les champs indéfinis/nuls pendant les synchronisations
-  const filteredPlayers = players.filter(p => {
+  // 🟢 FILTRE DOUBLE ÉTAPE : Filtrer par Ping actif (ligne) ET par terme de recherche
+  const activeOnlinePlayers = players.filter(p => p && p.ping !== undefined && p.ping > 0);
+
+  const filteredPlayers = activeOnlinePlayers.filter(p => {
     const name = p?.name || p?.player_name || p?.nickname || "Aventurier";
     const term = searchTerm || "";
     return name.toLowerCase().includes(term.toLowerCase());
@@ -195,7 +197,7 @@ export default function PalworldMap() {
               <div className="mb-4">
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joueurs Connectés</h2>
                 <div className="text-2xl font-black text-white mt-1">
-                  {players.length} <span className="text-xs font-normal text-slate-400">en ligne</span>
+                  {activeOnlinePlayers.length} <span className="text-xs font-normal text-slate-400">en ligne</span>
                 </div>
               </div>
 
@@ -214,7 +216,7 @@ export default function PalworldMap() {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-500 italic">
-                    Aucun joueur trouvé
+                    Aucun joueur connecté
                   </div>
                 ) : (
                   filteredPlayers.map((player) => {
@@ -281,7 +283,8 @@ export default function PalworldMap() {
               </div>
             </div>
 
-            {players.map((player) => {
+            {/* Affichage des marqueurs uniquement pour les joueurs actifs en ligne */}
+            {activeOnlinePlayers.map((player) => {
               const pId = player?.userId || player?.player_uid || "unknown";
               const pName = player?.name || player?.player_name || player?.nickname || "Aventurier";
               const position = gameToMap(player?.location_x ?? 0, player?.location_y ?? 0);
