@@ -85,8 +85,8 @@ export default function PalworldMap() {
   }, []);
 
   const filteredPlayers = players.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
+);
 
   return (
     <div className="relative w-screen h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-hidden">
@@ -165,7 +165,7 @@ export default function PalworldMap() {
                     >
                       <div className="flex justify-between items-start mb-1">
                         <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors">
-                          {player.name}
+                          {player.name ?? "Joueur inconnu"}
                         </span>
                         <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
                           LVL {player.level}
