@@ -30,6 +30,7 @@ export default function PalworldMap() {
     const percentY = (gameY + 1000) / 2000;
     const x = percentX * MAP_WIDTH;
     const y = (1 - percentY) * MAP_HEIGHT; 
+    console.log(`Coordonnées jeu: (${gameX}, ${gameY}) -> Pixels carte: [Y: ${y}, X: ${x}]`);
     return [y, x];
   };
 
