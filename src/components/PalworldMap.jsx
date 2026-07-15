@@ -26,14 +26,27 @@ export default function PalworldMap() {
 
   // Conversion des coordonnées réelles Unreal Engine -> pixels sur la carte 2048x2048
   const gameToMap = (gameX, gameY) => {
-    // Échelle de la carte du jeu (environ -1024000 à 1024000)
+    // 1. Échelle brute de l'Unreal Engine (ne pas toucher)
     const minCoord = -1024000;
     const maxCoord = 1024000;
-    const range = maxCoord - minCoord; // 2048000
+    const range = maxCoord - minCoord;
 
-    const percentX = (gameX - minCoord) / range;
-    const percentY = (gameY - minCoord) / range;
+    let percentX = (gameX - minCoord) / range;
+    let percentY = (gameY - minCoord) / range;
 
+    // 2. VARIABLES DE CALIBRATION (Modifie ces valeurs pour régler la position)
+    // Si le joueur est trop haut, on doit diminuer son Y sur la carte.
+    const offsetY = 0.529;  // Décale vers le bas (ex: -0.05 = -5% de la hauteur de la carte)
+    const offsetX = 0.091;   // Décale vers la droite/gauche si besoin
+
+    const scaleY = 1.00;    // Multiplicateur d'échelle verticale (ex: 0.95 pour rétrécir l'écart)
+    const scaleX = 1.00;    // Multiplicateur d'échelle horizontale
+
+    // Application de la calibration
+    percentX = (percentX * scaleX) + offsetX;
+    percentY = (percentY * scaleY) + offsetY;
+
+    // 3. Conversion finale en pixels (2048x2048)
     const x = percentX * MAP_WIDTH;
     const y = (1 - percentY) * MAP_HEIGHT; 
 
