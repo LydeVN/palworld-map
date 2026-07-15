@@ -21,8 +21,11 @@ export default function PalworldMap() {
   // Instance de la carte pour pouvoir la contrôler (recentrer, zoomer)
   const [map, setMap] = useState(null);
 
-  // Récupération de l'avatar Twitch pour un joueur donné
+  // Récupération de l'avatar Twitch pour un joueur donné (Sécurisé contre les noms vides)
   const fetchTwitchAvatar = async (username) => {
+    if (!username) {
+      return `https://ui-avatars.com/api/?name=Aventurier&background=f59e0b&color=0f172a&bold=true&rounded=true`;
+    }
     if (twitchAvatarCache[username]) {
       return twitchAvatarCache[username];
     }
@@ -51,21 +54,24 @@ export default function PalworldMap() {
     return fallback;
   };
 
-  // Charger les avatars quand la liste des joueurs change
+  // Charger les avatars quand la liste des joueurs change (Sécurisé)
   useEffect(() => {
     players.forEach(async (player) => {
-      if (player.avatar_url) {
-        setAvatars(prev => ({ ...prev, [player.userId]: player.avatar_url }));
+      const playerId = player?.userId || player?.player_uid || "unknown";
+      const playerName = player?.name || player?.player_name || "Aventurier";
+
+      if (player?.avatar_url) {
+        setAvatars(prev => ({ ...prev, [playerId]: player.avatar_url }));
         return;
       }
-      if (!avatars[player.userId]) {
-        const url = await fetchTwitchAvatar(player.name);
-        setAvatars(prev => ({ ...prev, [player.userId]: url }));
+      if (!avatars[playerId]) {
+        const url = await fetchTwitchAvatar(playerName);
+        setAvatars(prev => ({ ...prev, [playerId]: url }));
       }
     });
   }, [players]);
 
-  // Conversion calibrée : gère les inversions et l'échelle réelle de Palworld
+  // Conversion calibrée
   const gameToMap = (gameX, gameY) => {
     const minX = -1024000;
     const maxX = 1024000;
@@ -97,18 +103,21 @@ export default function PalworldMap() {
     return [y, x];
   };
 
-  // Fonction pour recentrer la carte sur un joueur spécifique
+  // Fonction pour recentrer la carte (Sécurisé)
   const focusOnPlayer = (player) => {
-    if (map) {
-      const position = gameToMap(player.location_x, player.location_y);
-      // Change la position et applique un niveau de zoom confortable (ex: 1)
+    if (map && player) {
+      const x = player.location_x ?? player.x ?? 0;
+      const y = player.location_y ?? player.y ?? 0;
+      const position = gameToMap(x, y);
       map.setView(position, 1, { animate: true, duration: 1 });
     }
   };
 
-  // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
+  // Création d'une icône Leaflet (Sécurisé)
   const createTwitchIcon = (username, userId) => {
-    const avatarUrl = avatars[userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=f59e0b&color=0f172a&bold=true`;
+    const safeName = username || "Aventurier";
+    const safeId = userId || "unknown";
+    const avatarUrl = avatars[safeId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=f59e0b&color=0f172a&bold=true`;
     
     return L.divIcon({
       className: 'custom-twitch-marker',
@@ -116,7 +125,7 @@ export default function PalworldMap() {
         <div class="relative group flex items-center justify-center">
           <div class="absolute inset-0 rounded-full bg-amber-500/40 animate-ping opacity-75"></div>
           <div class="w-10 h-10 rounded-full border-2 border-amber-500 bg-[#0f172a] p-0.5 overflow-hidden shadow-lg shadow-black/80 relative z-10 transition-transform duration-200 group-hover:scale-110">
-            <img src="${avatarUrl}" alt="${username}" class="w-full h-full rounded-full object-cover" />
+            <img src="${avatarUrl}" alt="${safeName}" class="w-full h-full rounded-full object-cover" />
           </div>
           <div class="w-3.5 h-3.5 bg-amber-500 rotate-45 absolute -bottom-1 z-0 rounded-sm shadow-md"></div>
         </div>
@@ -132,22 +141,29 @@ export default function PalworldMap() {
     ws.onopen = () => setConnected(true);
     ws.onclose = () => setConnected(false);
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'players_update') {
-        setPlayers(data.players || []);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'players_update') {
+          setPlayers(data.players || []);
+        }
+      } catch (err) {
+        console.error("Erreur parsing WebSocket message:", err);
       }
     };
     return () => ws.close();
   }, []);
 
-  const filteredPlayers = players.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 🛡️ FILTRE SÉCURISÉ CONTRE LES VALEURS UNDEFINED / NULL
+  const filteredPlayers = players.filter(p => {
+    const name = p?.name || p?.player_name || p?.nickname || "Aventurier";
+    const term = searchTerm || "";
+    return name.toLowerCase().includes(term.toLowerCase());
+  });
 
   return (
     <div className="relative w-screen h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-hidden">
       
-      {/* HEADER ULTRA MODERNE */}
+      {/* HEADER */}
       <header className="h-16 px-6 bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-800/80 flex justify-between items-center z-[999] shadow-lg shadow-black/20">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-md shadow-amber-500/20">
@@ -159,7 +175,6 @@ export default function PalworldMap() {
           </div>
         </div>
 
-        {/* Status indicator */}
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800/50">
             <span className={`relative flex h-2 w-2`}>
@@ -175,10 +190,8 @@ export default function PalworldMap() {
 
       <div className="flex-1 flex relative overflow-hidden">
         
-        {/* SIDEBAR DYNAMIQUE */}
+        {/* SIDEBAR */}
         <aside className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-80' : 'w-0'} bg-[#0f172a]/95 backdrop-blur-md border-r border-slate-800/85 flex flex-col z-[998] relative shadow-2xl`}>
-          
-          {/* Bouton pour fermer/ouvrir la sidebar */}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="absolute -right-10 top-4 w-10 h-10 bg-[#0f172a]/95 border-y border-r border-slate-800 flex items-center justify-center rounded-r-lg cursor-pointer text-slate-400 hover:text-amber-500 transition-colors shadow-md z-[1001]"
@@ -188,7 +201,6 @@ export default function PalworldMap() {
 
           {sidebarOpen && (
             <div className="p-4 flex flex-col h-full overflow-hidden">
-              {/* Titre Sidebar */}
               <div className="mb-4">
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joueurs Connectés</h2>
                 <div className="text-2xl font-black text-white mt-1">
@@ -196,7 +208,6 @@ export default function PalworldMap() {
                 </div>
               </div>
 
-              {/* Barre de Recherche */}
               <div className="relative mb-4">
                 <input 
                   type="text" 
@@ -207,52 +218,58 @@ export default function PalworldMap() {
                 />
               </div>
 
-              {/* Liste des Joueurs */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-500 italic">
                     Aucun joueur trouvé
                   </div>
                 ) : (
-                  filteredPlayers.map((player) => (
-                    <div 
-                      key={player.userId}
-                      onClick={() => focusOnPlayer(player)}
-                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start mb-1 flex-nowrap gap-2">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <img 
-                            src={avatars[player.userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=f59e0b&color=0f172a&bold=true`} 
-                            alt="" 
-                            className="w-6 h-6 rounded-full border border-amber-500/50 object-cover flex-shrink-0"
-                          />
-                          <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors truncate">
-                            {player.name}
+                  filteredPlayers.map((player) => {
+                    const playerId = player?.userId || player?.player_uid || "unknown";
+                    const playerName = player?.name || player?.player_name || player?.nickname || "Aventurier";
+                    const xLoc = player?.location_x ?? player?.x ?? 0;
+                    const yLoc = player?.location_y ?? player?.y ?? 0;
+
+                    return (
+                      <div 
+                        key={playerId}
+                        onClick={() => focusOnPlayer(player)}
+                        className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group cursor-pointer"
+                      >
+                        <div className="flex justify-between items-start mb-1 flex-nowrap gap-2">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <img 
+                              src={avatars[playerId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=f59e0b&color=0f172a&bold=true`} 
+                              alt="" 
+                              className="w-6 h-6 rounded-full border border-amber-500/50 object-cover flex-shrink-0"
+                            />
+                            <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors truncate">
+                              {playerName}
+                            </span>
+                          </div>
+                          <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 self-center">
+                            LVL {player?.level ?? 0}
                           </span>
                         </div>
-                        <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 self-center">
-                          LVL {player.level}
-                        </span>
+                        <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-1">
+                          <span>X: {Math.round(xLoc)} | Y: {Math.round(yLoc)}</span>
+                          {player?.ping !== undefined && (
+                            <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-1">
-                        <span>X: {Math.round(player.location_x)} | Y: {Math.round(player.location_y)}</span>
-                        {player.ping !== undefined && (
-                          <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
           )}
         </aside>
 
-        {/* CONTAINER DE LA CARTE INTEGRÉE */}
+        {/* MAP CONTAINER */}
         <div className="flex-1 h-full relative bg-[#090d16]">
           <MapContainer
-            ref={setMap} // Stocke l'instance de la carte dans l'état "map"
+            ref={setMap}
             crs={L.CRS.Simple}
             bounds={bounds}
             maxZoom={2}
@@ -268,7 +285,6 @@ export default function PalworldMap() {
               bounds={bounds}
             />
 
-            {/* Repositionnement manuel des contrôles de zoom pour le design */}
             <div className="leaflet-top leaflet-right !mt-4 !mr-4">
               <div className="leaflet-bar border-0 shadow-lg">
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-t-lg" title="Zoom in" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomIn')); }}>+</a>
@@ -277,26 +293,31 @@ export default function PalworldMap() {
             </div>
 
             {players.map((player) => {
-              const position = gameToMap(player.location_x, player.location_y);
-              const customIcon = createTwitchIcon(player.name, player.userId);
+              const playerId = player?.userId || player?.player_uid || "unknown";
+              const playerName = player?.name || player?.player_name || player?.nickname || "Aventurier";
+              const xLoc = player?.location_x ?? player?.x ?? 0;
+              const yLoc = player?.location_y ?? player?.y ?? 0;
+              
+              const position = gameToMap(xLoc, yLoc);
+              const customIcon = createTwitchIcon(playerName, playerId);
               
               return (
-                <Marker key={player.userId} position={position} icon={customIcon}>
+                <Marker key={playerId} position={position} icon={customIcon}>
                   <Popup className="custom-popup">
                     <div className="text-slate-100 bg-[#0f172a] border border-slate-800 p-2 rounded-lg shadow-xl font-sans min-w-[140px]">
                       <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center gap-2">
                         <div className="flex items-center gap-1.5">
-                          <img src={avatars[player.userId]} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          <strong className="text-sm font-bold text-amber-500">{player.name}</strong>
+                          <img src={avatars[playerId]} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          <strong className="text-sm font-bold text-amber-500">{playerName}</strong>
                         </div>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1 rounded flex-shrink-0">Lv.{player.level}</span>
+                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1 rounded flex-shrink-0">Lv.{player?.level ?? 0}</span>
                       </div>
                       <div className="text-[10px] font-mono text-slate-400 space-y-0.5">
                         <div className="flex justify-between">
                           <span>Secteur:</span>
-                          <span className="text-slate-200">X:{Math.round(player.location_x)} Y:{Math.round(player.location_y)}</span>
+                          <span className="text-slate-200">X:{Math.round(xLoc)} Y:{Math.round(yLoc)}</span>
                         </div>
-                        {player.ping !== undefined && (
+                        {player?.ping !== undefined && (
                           <div className="flex justify-between">
                             <span>Latence:</span>
                             <span className="text-emerald-400">{Math.round(player.ping)} ms</span>
@@ -312,17 +333,15 @@ export default function PalworldMap() {
         </div>
       </div>
 
-      {/* Styles d'ajustement pour forcer Leaflet à respecter notre thème sombre */}
+      {/* Styles */}
       <style>{`
         .leaflet-container {
           background: #090d16 !important;
         }
-        /* Style des conteneurs personnalisés d'icônes Leaflet */
         .custom-twitch-marker {
           background: none !important;
           border: none !important;
         }
-        /* Rendre les popups Leaflet entièrement transparentes et sombres */
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
           background: transparent !important;
           box-shadow: none !important;
@@ -336,7 +355,6 @@ export default function PalworldMap() {
           color: #94a3b8 !important;
           padding: 6px 6px 0 0 !important;
         }
-        /* Custom scrollbar pour la sidebar */
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }
