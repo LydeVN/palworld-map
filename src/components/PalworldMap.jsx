@@ -4,14 +4,13 @@ import L from 'leaflet';
 import { API_CONFIG } from '../config';
 import 'leaflet/dist/leaflet.css';
 
-// Fix pour les marqueurs Leaflet
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+// Fix robuste pour les marqueurs Leaflet en production (Vite)
 const DefaultIcon = L.icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
   iconSize: [25, 41],
-  iconAnchor: [12, 41]
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34]
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
@@ -97,7 +96,7 @@ export default function PalworldMap() {
             <div className="p-4 flex flex-col h-full overflow-hidden">
               {/* Titre Sidebar */}
               <div className="mb-4">
-                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Survivants Connectés</h2>
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joueurs Connectés</h2>
                 <div className="text-2xl font-black text-white mt-1">
                   {players.length} <span className="text-xs font-normal text-slate-400">en ligne</span>
                 </div>
@@ -157,7 +156,8 @@ export default function PalworldMap() {
             minZoom={-2}
             zoom={-1}
             center={[MAP_HEIGHT / 2, MAP_WIDTH / 2]}
-            zoomControl={false} // On cache le zoom par défaut pour faire plus propre
+            zoomControl={false}
+            style={{ height: '100%', width: '100%', position: 'absolute' }}
             className="w-full h-full"
           >
             <ImageOverlay
