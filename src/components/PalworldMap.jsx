@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, ImageOverlay, Marker, Popup } from 'react-leaflet';
+import { MapContainer, ImageOverlay, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { API_CONFIG } from '../config';
 import 'leaflet/dist/leaflet.css';
@@ -18,75 +18,92 @@ const MAP_WIDTH = 2048;
 const MAP_HEIGHT = 2048;
 const bounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
 
+// Composant interne pour lier les boutons de zoom customisés à Leaflet
+function MapController() {
+  const map = useMap();
+  useEffect(() => {
+    const handleZoomIn = () => map.zoomIn();
+    const handleZoomOut = () => map.zoomOut();
+
+    window.addEventListener('zoomIn', handleZoomIn);
+    window.addEventListener('zoomOut', handleZoomOut);
+
+    return () => {
+      window.removeEventListener('zoomIn', handleZoomIn);
+      window.removeEventListener('zoomOut', handleZoomOut);
+    };
+  }, [map]);
+
+  return null;
+}
+
 export default function PalworldMap() {
   const [players, setPlayers] = useState([]);
   const [connected, setConnected] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Conversion calibrée : gère les inversions et l'échelle réelle de Palworld
+  // CONSERVATION STRICTE DE TOUS TES CALCULS DE CALIBRATION ET OFFSETS
   const gameToMap = (gameX, gameY) => {
-    // 1. Bornes réelles de la carte Palworld en Unreal Units
-    // Ces valeurs définissent la "fenêtre" de jeu visible sur ton image palpagos.webp
     const minX = -1024000;
     const maxX = 1024000;
     const minY = -1024000;
     const maxY = 1024000;
 
-    // 2. Calcul du pourcentage brut sur chaque axe
     let percentX = (gameX - minX) / (maxX - minX);
     let percentY = (gameY - minY) / (maxY - minY);
 
-    // 3. CALIBRATION ET CORRECTION DES AXES
-    // Palworld utilise un système d'axes qui nécessite souvent d'associer
-    // le X du jeu au Y de l'écran, ou d'inverser un axe.
-    // D'après tes symptômes (aller à gauche te fait monter) :
-    // On inverse les axes pour que le déplacement latéral influe sur l'axe horizontal.
-    
-    // Échange des axes pour corriger la rotation de 90° :
     const temp = percentX;
     percentX = percentY;
     percentY = temp;
 
-    // Ajustements fins d'échelle pour que tout le monde reste dans le cadre
     const scaleX = 1.42; 
     const scaleY = 1.42;
 
-    // Ajustements de décalage (Offsets) pour centrer parfaitement
-    const offsetX = -0.21; // Décale vers la gauche/droite (- pour gauche, + pour droite)
-    const offsetY = 0.05; // Décale vers le haut/bas (- pour bas, + pour haut)
+    const offsetX = -0.21; 
+    const offsetY = 0.05; 
 
-    // Application des coefficients
     percentX = (percentX * scaleX) + offsetX;
     percentY = (percentY * scaleY) + offsetY;
 
-    // Bornage de sécurité (évite que l'icône sorte des limites 0% - 100%)
     percentX = Math.max(0, Math.min(1, percentX));
     percentY = Math.max(0, Math.min(1, percentY));
 
-    // 4. Conversion finale en pixels Leaflet (Y inversé car le point [0,0] est en bas à gauche pour Leaflet Simple CRS)
     const x = percentX * MAP_WIDTH;
     const y = percentY * MAP_HEIGHT; 
 
     return [y, x];
   };
 
+  // Synchronisation WebSocket temps réel avec ton nouveau backend REST API
   useEffect(() => {
     const ws = new WebSocket(`${API_CONFIG.WS_BASE_URL}/ws/players`);
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
+    
+    ws.onopen = () => {
+      setConnected(true);
+    };
+    
+    ws.onclose = () => {
+      setConnected(false);
+    };
+    
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'players_update') {
-        setPlayers(data.players || []);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'players_update') {
+          setPlayers(data.players || []);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la réception des données joueurs:", err);
       }
     };
+    
     return () => ws.close();
   }, []);
 
   const filteredPlayers = players.filter(p => 
-  p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
-);
+    p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
+  );
 
   return (
     <div className="relative w-screen h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-hidden">
@@ -103,10 +120,10 @@ export default function PalworldMap() {
           </div>
         </div>
 
-        {/* Status indicator */}
+        {/* Statut de la connexion */}
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800/50">
-            <span className={`relative flex h-2 w-2`}>
+            <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connected ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${connected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
             </span>
@@ -122,7 +139,7 @@ export default function PalworldMap() {
         {/* SIDEBAR DYNAMIQUE */}
         <aside className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-80' : 'w-0'} bg-[#0f172a]/95 backdrop-blur-md border-r border-slate-800/85 flex flex-col z-[998] relative shadow-2xl`}>
           
-          {/* Bouton pour fermer/ouvrir la sidebar */}
+          {/* Bouton ouvrir/fermer */}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="absolute -right-10 top-4 w-10 h-10 bg-[#0f172a]/95 border-y border-r border-slate-800 flex items-center justify-center rounded-r-lg cursor-pointer text-slate-400 hover:text-amber-500 transition-colors shadow-md z-[1001]"
@@ -132,7 +149,6 @@ export default function PalworldMap() {
 
           {sidebarOpen && (
             <div className="p-4 flex flex-col h-full overflow-hidden">
-              {/* Titre Sidebar */}
               <div className="mb-4">
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joueurs Connectés</h2>
                 <div className="text-2xl font-black text-white mt-1">
@@ -185,7 +201,7 @@ export default function PalworldMap() {
           )}
         </aside>
 
-        {/* CONTAINER DE LA CARTE INTEGRÉE */}
+        {/* CONTAINER DE LA CARTE */}
         <div className="flex-1 h-full relative bg-[#090d16]">
           <MapContainer
             crs={L.CRS.Simple}
@@ -198,13 +214,14 @@ export default function PalworldMap() {
             style={{ height: '100%', width: '100%', position: 'absolute' }}
             className="w-full h-full"
           >
+            <MapController />
             <ImageOverlay
               url="palpagos.webp"
               bounds={bounds}
             />
 
-            {/* Repositionnement manuel des contrôles de zoom pour le design */}
-            <div className="leaflet-top leaflet-right !mt-4 !mr-4">
+            {/* Repositionnement manuel des contrôles de zoom */}
+            <div className="leaflet-top leaflet-right !mt-4 !mr-4 z-[1000]">
               <div className="leaflet-bar border-0 shadow-lg">
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-t-lg" title="Zoom in" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomIn')); }}>+</a>
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-b-lg" title="Zoom out" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomOut')); }}>−</a>
@@ -242,12 +259,10 @@ export default function PalworldMap() {
         </div>
       </div>
 
-      {/* Styles d'ajustement pour forcer Leaflet à respecter notre thème sombre */}
       <style>{`
         .leaflet-container {
           background: #090d16 !important;
         }
-        /* Rendre les popups Leaflet entièrement transparentes et sombres */
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
           background: transparent !important;
           box-shadow: none !important;
@@ -261,7 +276,6 @@ export default function PalworldMap() {
           color: #94a3b8 !important;
           padding: 6px 6px 0 0 !important;
         }
-        /* Custom scrollbar pour la sidebar */
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
         }
