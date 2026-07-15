@@ -1,45 +1,34 @@
 import React, { useEffect, useState } from 'react';
+import { MapContainer, ImageOverlay, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
 import { API_CONFIG } from '../config';
+import 'leaflet/dist/leaflet.css';
 
-// Cache local pour les avatars Twitch
+const MAP_WIDTH = 2048;
+const MAP_HEIGHT = 2048;
+const bounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
+
+// Cache pour éviter de spammer l'API Twitch pour les mêmes joueurs
 const twitchAvatarCache = {};
 
-export default function PlayersDashboard() {
-  const [allPlayers, setAllPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function PalworldMap() {
+  const [players, setPlayers] = useState([]);
+  const [connected, setConnected] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [avatars, setAvatars] = useState({});
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  
+  // Instance de la carte pour pouvoir la contrôler (recentrer, zoomer)
+  const [map, setMap] = useState(null);
 
-  // Récupération des données réelles du backend (Uvicorn / FastAPI)
-  useEffect(() => {
-    const fetchAllPlayers = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${API_CONFIG.API_BASE_URL}/api/players`);
-        const data = await response.json();
-        
-        // On récupère le tableau sous 'players' renvoyé par le backend
-        if (data && data.players) {
-          setAllPlayers(data.players);
-        } else {
-          setAllPlayers([]);
-        }
-      } catch (err) {
-        console.error("Erreur lors de la récupération des joueurs:", err);
-        // Secours si le backend est injoignable
-        setAllPlayers(getMockPlayersData());
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllPlayers();
-  }, []);
-
-  // Récupération des avatars Twitch (identique à ton système sur la carte)
+  // Récupération de l'avatar Twitch pour un joueur donné
   const fetchTwitchAvatar = async (username) => {
-    if (twitchAvatarCache[username]) return twitchAvatarCache[username];
+    if (!username) return `https://ui-avatars.com/api/?name=Aventurier&background=f59e0b&color=0f172a&bold=true&rounded=true`;
+    
+    if (twitchAvatarCache[username]) {
+      return twitchAvatarCache[username];
+    }
+
     try {
       if (API_CONFIG.TWITCH_CLIENT_ID && API_CONFIG.TWITCH_OAUTH_TOKEN) {
         const response = await fetch(`https://api.twitch.tv/helix/users?login=${username.toLowerCase()}`, {
@@ -55,261 +44,325 @@ export default function PlayersDashboard() {
           return url;
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Erreur lors de la récupération de l'avatar Twitch pour", username, err);
+    }
+
     const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=f59e0b&color=0f172a&bold=true&rounded=true`;
     twitchAvatarCache[username] = fallback;
     return fallback;
   };
 
+  // Charger les avatars quand la liste des joueurs change
   useEffect(() => {
-    allPlayers.forEach(async (player) => {
-      const playerId = player.userId || player.player_uid;
-      const playerName = player.name || player.player_name;
+    if (!players || players.length === 0) return;
+
+    players.forEach(async (player) => {
+      if (!player || !player.userId) return;
 
       if (player.avatar_url) {
-        setAvatars(prev => ({ ...prev, [playerId]: player.avatar_url }));
+        setAvatars(prev => ({ ...prev, [player.userId]: player.avatar_url }));
         return;
       }
-      if (!avatars[playerId]) {
-        const url = await fetchTwitchAvatar(playerName);
-        setAvatars(prev => ({ ...prev, [playerId]: url }));
+      if (!avatars[player.userId]) {
+        const url = await fetchTwitchAvatar(player.name);
+        setAvatars(prev => ({ ...prev, [player.userId]: url }));
       }
     });
-  }, [allPlayers]);
+  }, [players]);
 
-  const filteredPlayers = allPlayers.filter(p => {
-    const name = p.name || p.player_name || "";
-    return name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  // Conversion calibrée : STRICTEMENT tes offsets et échelles d'origine
+  const gameToMap = (gameX, gameY) => {
+    const minX = -1024000;
+    const maxX = 1024000;
+    const minY = -1024000;
+    const maxY = 1024000;
+
+    let percentX = (gameX - minX) / (maxX - minX);
+    let percentY = (gameY - minY) / (maxY - minY);
+    
+    const temp = percentX;
+    percentX = percentY;
+    percentY = temp;
+
+    const scaleX = 1.42; 
+    const scaleY = 1.42;
+
+    const offsetX = -0.21;
+    const offsetY = 0.05;
+
+    percentX = (percentX * scaleX) + offsetX;
+    percentY = (percentY * scaleY) + offsetY;
+
+    percentX = Math.max(0, Math.min(1, percentX));
+    percentY = Math.max(0, Math.min(1, percentY));
+
+    const x = percentX * MAP_WIDTH;
+    const y = percentY * MAP_HEIGHT; 
+
+    return [y, x];
+  };
+
+  // Fonction pour recentrer la carte sur un joueur spécifique
+  const focusOnPlayer = (player) => {
+    if (map && player) {
+      const position = gameToMap(player.location_x, player.location_y);
+      map.setView(position, 1, { animate: true, duration: 1 });
+    }
+  };
+
+  // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
+  const createTwitchIcon = (username, userId) => {
+    const safeName = username || "Aventurier";
+    const avatarUrl = avatars[userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=f59e0b&color=0f172a&bold=true`;
+    
+    return L.divIcon({
+      className: 'custom-twitch-marker',
+      html: `
+        <div class="relative group flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full bg-amber-500/40 animate-ping opacity-75"></div>
+          <div class="w-10 h-10 rounded-full border-2 border-amber-500 bg-[#0f172a] p-0.5 overflow-hidden shadow-lg shadow-black/80 relative z-10 transition-transform duration-200 group-hover:scale-110">
+            <img src="${avatarUrl}" alt="${safeName}" class="w-full h-full rounded-full object-cover" />
+          </div>
+          <div class="w-3.5 h-3.5 bg-amber-500 rotate-45 absolute -bottom-1 z-0 rounded-sm shadow-md"></div>
+        </div>
+      `,
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -42]
+    });
+  };
+
+  useEffect(() => {
+    const ws = new WebSocket(`${API_CONFIG.WS_BASE_URL}/ws/players`);
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'players_update') {
+          setPlayers(data.players || []);
+        }
+      } catch (err) {
+        console.error("Erreur de parsing WebSocket:", err);
+      }
+    };
+    return () => ws.close();
+  }, []);
+
+  const filteredPlayers = players.filter(p => 
+    p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
+  );
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 p-6 font-sans">
+    <div className="relative w-screen h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-hidden">
       
-      {/* HEADER DE LA PAGE */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
-        <div>
-          <h1 className="text-3xl font-black tracking-wider text-amber-500 uppercase">Registre des Aventuriers</h1>
-          <p className="text-sm text-slate-400 font-mono mt-1">PROFILES, PALS ET STATISTIQUES GLOBALES DU SERVEUR</p>
+      {/* HEADER ULTRA MODERNE */}
+      <header className="h-16 px-6 bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-800/80 flex justify-between items-center z-[999] shadow-lg shadow-black/20">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-md shadow-amber-500/20">
+            <span className="font-black text-slate-950 text-sm">PW</span>
+          </div>
+          <div>
+            <h1 className="text-md font-bold tracking-wider text-amber-500 uppercase">Palworld Community</h1>
+            <p className="text-[10px] text-slate-400 font-mono">LIVE TRACKING RADAR</p>
+          </div>
         </div>
+
+        {/* Status indicator */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800/50">
+            <span className={`relative flex h-2 w-2`}>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${connected ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${connected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+            </span>
+            <span className="text-xs font-medium text-slate-300">
+              {connected ? 'LIVE SYNC' : 'OFFLINE'}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex relative overflow-hidden">
         
-        {/* BARRE DE RECHERCHE */}
-        <div className="w-full md:w-80">
-          <input 
-            type="text" 
-            placeholder="Rechercher un aventurier..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950/80 border border-slate-800 focus:border-amber-500/50 rounded-lg px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none transition-all shadow-inner"
-          />
+        {/* SIDEBAR DYNAMIQUE */}
+        <aside className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-80' : 'w-0'} bg-[#0f172a]/95 backdrop-blur-md border-r border-slate-800/85 flex flex-col z-[998] relative shadow-2xl`}>
+          
+          {/* Bouton pour fermer/ouvrir la sidebar */}
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="absolute -right-10 top-4 w-10 h-10 bg-[#0f172a]/95 border-y border-r border-slate-800 flex items-center justify-center rounded-r-lg cursor-pointer text-slate-400 hover:text-amber-500 transition-colors shadow-md z-[1001]"
+          >
+            {sidebarOpen ? '◀' : '▶'}
+          </button>
+
+          {sidebarOpen && (
+            <div className="p-4 flex flex-col h-full overflow-hidden">
+              {/* Titre Sidebar */}
+              <div className="mb-4">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Joueurs Connectés</h2>
+                <div className="text-2xl font-black text-white mt-1">
+                  {players.length} <span className="text-xs font-normal text-slate-400">en ligne</span>
+                </div>
+              </div>
+
+              {/* Barre de Recherche */}
+              <div className="relative mb-4">
+                <input 
+                  type="text" 
+                  placeholder="Rechercher un joueur..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-amber-500/50 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Liste des Joueurs */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {filteredPlayers.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-slate-500 italic">
+                    Aucun joueur trouvé
+                  </div>
+                ) : (
+                  filteredPlayers.map((player) => (
+                    <div 
+                      key={player.userId}
+                      onClick={() => focusOnPlayer(player)}
+                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group cursor-pointer"
+                    >
+                      <div className="flex justify-between items-start mb-1 flex-nowrap gap-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <img 
+                            src={avatars[player.userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name || "A")}&background=f59e0b&color=0f172a&bold=true`} 
+                            alt="" 
+                            className="w-6 h-6 rounded-full border border-amber-500/50 object-cover flex-shrink-0"
+                          />
+                          <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors truncate">
+                            {player.name}
+                          </span>
+                        </div>
+                        <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 self-center">
+                          LVL {player.level}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-1">
+                        <span>X: {Math.round(player.location_x)} | Y: {Math.round(player.location_y)}</span>
+                        {player.ping !== undefined && (
+                          <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* CONTAINER DE LA CARTE INTEGRÉE */}
+        <div className="flex-1 h-full relative bg-[#090d16]">
+          <MapContainer
+            ref={setMap} // Stocke l'instance de la carte dans l'état "map"
+            crs={L.CRS.Simple}
+            bounds={bounds}
+            maxZoom={2}
+            minZoom={-2}
+            zoom={-1}
+            center={[MAP_HEIGHT / 2, MAP_WIDTH / 2]}
+            zoomControl={false}
+            style={{ height: '100%', width: '100%', position: 'absolute' }}
+            className="w-full h-full"
+          >
+            <ImageOverlay
+              url="palpagos.webp"
+              bounds={bounds}
+            />
+
+            {/* Repositionnement manuel des contrôles de zoom pour le design */}
+            <div className="leaflet-top leaflet-right !mt-4 !mr-4">
+              <div className="leaflet-bar border-0 shadow-lg">
+                <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-t-lg" title="Zoom in" onClick={(e) => { e.preventDefault(); if (map) map.zoomIn(); }}>+</a>
+                <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-b-lg" title="Zoom out" onClick={(e) => { e.preventDefault(); if (map) map.zoomOut(); }}>−</a>
+              </div>
+            </div>
+
+            {players.map((player) => {
+              if (!player) return null;
+              const position = gameToMap(player.location_x, player.location_y);
+              const customIcon = createTwitchIcon(player.name, player.userId);
+              const avatarUrl = avatars[player.userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name || "A")}&background=f59e0b&color=0f172a&bold=true`;
+              
+              return (
+                <Marker key={player.userId} position={position} icon={customIcon}>
+                  <Popup className="custom-popup">
+                    <div className="text-slate-100 bg-[#0f172a] border border-slate-800 p-2 rounded-lg shadow-xl font-sans min-w-[140px]">
+                      <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          <strong className="text-sm font-bold text-amber-500">{player.name}</strong>
+                        </div>
+                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1 rounded flex-shrink-0">Lv.{player.level}</span>
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-400 space-y-0.5">
+                        <div className="flex justify-between">
+                          <span>Secteur:</span>
+                          <span className="text-slate-200">X:{Math.round(player.location_x)} Y:{Math.round(player.location_y)}</span>
+                        </div>
+                        {player.ping !== undefined && (
+                          <div className="flex justify-between">
+                            <span>Latence:</span>
+                            <span className="text-emerald-400">{Math.round(player.ping)} ms</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MapContainer>
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-500"></div>
-        </div>
-      ) : (
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPlayers.map((player) => {
-            const playerId = player.userId || player.player_uid || "unknown";
-            const playerName = player.name || player.player_name || "Inconnu";
-            
-            return (
-              <div 
-                key={playerId}
-                onClick={() => setSelectedPlayer(player)}
-                className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 hover:border-amber-500/40 rounded-xl p-5 cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg hover:shadow-amber-500/5 group flex flex-col justify-between"
-              >
-                <div>
-                  {/* ID & NIVEAU */}
-                  <div className="flex justify-between items-center mb-4">
-                    <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
-                      player.isOnline 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : 'bg-slate-800/60 text-slate-400 border border-slate-700/30'
-                    }`}>
-                      {player.isOnline ? '● EN LIGNE' : 'HORS LIGNE'}
-                    </span>
-                    <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded font-mono font-black">
-                      LVL {player.level || 0}
-                    </span>
-                  </div>
-
-                  {/* PROFIL JOUEUR */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <img 
-                      src={avatars[playerId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(playerName)}&background=f59e0b&color=0f172a&bold=true`} 
-                      alt={playerName}
-                      className="w-14 h-14 rounded-full border-2 border-slate-800 group-hover:border-amber-500/50 transition-colors object-cover"
-                    />
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-100 group-hover:text-amber-400 transition-colors truncate max-w-[160px]">
-                        {playerName}
-                      </h3>
-                      <p className="text-xs text-slate-500 font-mono">Guilde : {player.guildName || 'Sans Guilde'}</p>
-                    </div>
-                  </div>
-
-                  {/* MINI APERÇU DES PALS DE L'ÉQUIPE */}
-                  <div className="border-t border-slate-800/60 pt-4 mt-2">
-                    <h4 className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2">Équipe active</h4>
-                    <div className="flex gap-2">
-                      {player.pals && player.pals.slice(0, 5).map((pal, idx) => (
-                        <div 
-                          key={idx} 
-                          className="w-10 h-10 bg-slate-950/80 rounded-lg border border-slate-800 flex flex-col items-center justify-center relative group/pal"
-                          title={`${pal.name} (Lvl ${pal.level})`}
-                        >
-                          <span className="text-lg">{pal.emoji || '🐾'}</span>
-                          <span className="absolute -bottom-1 -right-1 bg-slate-900 border border-slate-800 text-[8px] px-0.5 rounded font-bold font-mono text-amber-500">
-                            {pal.level}
-                          </span>
-                        </div>
-                      ))}
-                      {(!player.pals || player.pals.length === 0) && (
-                        <p className="text-xs text-slate-500 italic py-1">Aucun Pal équipé</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* STATS RAPIDES */}
-                <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-800/60 pt-4 mt-4">
-                  <span>Pals Capturés : <strong className="text-slate-300">{player.capturedCount || 0}</strong></span>
-                  <span>Morts : <strong className="text-slate-300">{player.deaths || 0}</strong></span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* MODAL DE DÉTAIL DU JOUEUR */}
-      {selectedPlayer && (() => {
-        const selectedId = selectedPlayer.userId || selectedPlayer.player_uid || "unknown";
-        const selectedName = selectedPlayer.name || selectedPlayer.player_name || "Inconnu";
-
-        return (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
-              
-              {/* Bouton Fermer */}
-              <button 
-                onClick={() => setSelectedPlayer(null)}
-                className="absolute right-4 top-4 text-slate-400 hover:text-white text-xl cursor-pointer"
-              >
-                ✕
-              </button>
-
-              {/* Header Modal */}
-              <div className="p-6 bg-slate-950/50 border-b border-slate-800 flex items-center gap-4">
-                <img 
-                  src={avatars[selectedId]} 
-                  alt="" 
-                  className="w-16 h-16 rounded-full border-2 border-amber-500 object-cover" 
-                />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-black text-amber-500">{selectedName}</h2>
-                    <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs px-2 py-0.5 rounded font-mono font-black">
-                      LVL {selectedPlayer.level || 0}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">UID: {selectedId}</p>
-                </div>
-              </div>
-
-              {/* Contenu Modal */}
-              <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                
-                {/* Infos Générales */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 font-mono">
-                  <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800">
-                    <span className="text-[10px] text-slate-500 block uppercase">Guilde</span>
-                    <span className="text-sm font-bold text-slate-200">{selectedPlayer.guildName || 'Aucune'}</span>
-                  </div>
-                  <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800">
-                    <span className="text-[10px] text-slate-500 block uppercase">Temps de jeu</span>
-                    <span className="text-sm font-bold text-slate-200">{selectedPlayer.playTime || '0h'}</span>
-                  </div>
-                  <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800">
-                    <span className="text-[10px] text-slate-500 block uppercase">Statut</span>
-                    <span className={`text-sm font-bold ${selectedPlayer.isOnline ? 'text-emerald-400' : 'text-slate-400'}`}>
-                      {selectedPlayer.isOnline ? 'En ligne' : 'Hors ligne'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Équipe Complète de Pals détaillés */}
-                <div>
-                  <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">Pals dans l'équipe ({selectedPlayer.pals?.length || 0})</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {selectedPlayer.pals?.map((pal, idx) => (
-                      <div key={idx} className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center gap-3">
-                        <div className="w-12 h-12 bg-slate-950 rounded-lg flex items-center justify-center text-2xl border border-slate-800">
-                          {pal.emoji || '🐾'}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <div className="flex justify-between items-center">
-                            <strong className="text-sm text-slate-200 truncate">{pal.name}</strong>
-                            <span className="text-xs text-amber-500 font-mono font-bold">Lvl {pal.level}</span>
-                          </div>
-                          {/* Traits / Compétences passives */}
-                          {pal.passives && pal.passives.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {pal.passives.map((passive, pIdx) => (
-                                <span key={pIdx} className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 rounded font-sans uppercase">
-                                  {passive}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Styles d'ajustement pour forcer Leaflet à respecter notre thème sombre */}
+      <style>{`
+        .leaflet-container {
+          background: #090d16 !important;
+        }
+        /* Style des conteneurs personnalisés d'icônes Leaflet */
+        .custom-twitch-marker {
+          background: none !important;
+          border: none !important;
+        }
+        /* Rendre les popups Leaflet entièrement transparentes et sombres */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+          padding: 0 !important;
+        }
+        .leaflet-popup-content {
+          margin: 0 !important;
+        }
+        .leaflet-popup-close-button {
+          color: #94a3b8 !important;
+          padding: 6px 6px 0 0 !important;
+        }
+        /* Custom scrollbar pour la sidebar */
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #334155;
+          border-radius: 99px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #f59e0b;
+        }
+      `}</style>
     </div>
   );
-}
-
-// Données fictives de secours si l'API est injoignable
-function getMockPlayersData() {
-  return [
-    {
-      userId: "player_01",
-      name: "TwitchGamer",
-      level: 48,
-      isOnline: true,
-      guildName: "Les Pal-adinautes",
-      capturedCount: 142,
-      deaths: 12,
-      playTime: "74h",
-      pals: [
-        { name: "Anubis", level: 45, emoji: "🦊", passives: ["Chef d'équipe", "Vitesse folle"] },
-        { name: "Jetragon", level: 48, emoji: "🐉", passives: ["Légende", "Sprint"] },
-        { name: "Grizzbolt", level: 42, emoji: "⚡", passives: ["Gros bras"] }
-      ]
-    },
-    {
-      userId: "player_02",
-      name: "Slayer_FR",
-      level: 22,
-      isOnline: false,
-      guildName: "Mercenaires",
-      capturedCount: 45,
-      deaths: 34,
-      playTime: "18h",
-      pals: [
-        { name: "Lamball", level: 20, emoji: "🐑", passives: ["Lâche"] },
-        { name: "Depresso", level: 22, emoji: "🙀", passives: ["Insomniaque", "Négatif"] }
-      ]
-    }
-  ];
 }
