@@ -176,11 +176,11 @@ export default function PalworldMap() {
                 ) : (
                   filteredPlayers.map((player) => (
                     <div 
-                      key={player.userId}
+                      key={player.uid || player.userId}
                       className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group"
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-sm text-slate-250 group-hover:text-amber-400 transition-colors">
+                        <span className="font-bold text-sm text-slate-200 group-hover:text-amber-400 transition-colors">
                           {player.name ?? "Joueur inconnu"}
                         </span>
                         <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
@@ -188,7 +188,7 @@ export default function PalworldMap() {
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
-                        <span>X: {Math.round(player.location_x)} | Y: {Math.round(player.location_y)}</span>
+                        <span>X: {Math.round(player.location_x || 0)} | Y: {Math.round(player.location_y || 0)}</span>
                         {player.ping !== undefined && (
                           <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
                         )}
@@ -229,9 +229,9 @@ export default function PalworldMap() {
             </div>
 
             {players.map((player) => {
-              const position = gameToMap(player.location_x, player.location_y);
+              const position = gameToMap(player.location_x || 0, player.location_y || 0);
               return (
-                <Marker key={player.userId} position={position}>
+                <Marker key={player.uid || player.userId} position={position}>
                   <Popup className="custom-popup">
                     <div className="text-slate-100 bg-[#0f172a] border border-slate-800 p-2 rounded-lg shadow-xl font-sans min-w-[140px]">
                       <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center">
@@ -241,7 +241,7 @@ export default function PalworldMap() {
                       <div className="text-[10px] font-mono text-slate-400 space-y-0.5">
                         <div className="flex justify-between">
                           <span>Secteur:</span>
-                          <span className="text-slate-200">X:{Math.round(player.location_x)} Y:{Math.round(player.location_y)}</span>
+                          <span className="text-slate-200">X:{Math.round(player.location_x || 0)} Y:{Math.round(player.location_y || 0)}</span>
                         </div>
                         {player.ping !== undefined && (
                           <div className="flex justify-between">

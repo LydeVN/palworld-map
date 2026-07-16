@@ -1,14 +1,133 @@
 import React, { useState, useEffect } from 'react';
 
+// Dictionnaire de traduction française pour les aptitudes au travail
+const WORK_TRANSLATIONS = {
+  "WorkSuitability_EmitFlame": { name: "Allumage de feu", color: "text-red-400 bg-red-950/40 border-red-900/40" },
+  "WorkSuitability_Watering": { name: "Arrosage", color: "text-blue-400 bg-blue-950/40 border-blue-900/40" },
+  "WorkSuitability_Seeding": { name: "Semence", color: "text-emerald-400 bg-emerald-950/40 border-emerald-900/40" },
+  "WorkSuitability_GeneratingElectricity": { name: "Génération d'énergie", color: "text-yellow-400 bg-yellow-950/40 border-yellow-900/40" },
+  "WorkSuitability_Handwork": { name: "Travaux manuels", color: "text-amber-400 bg-amber-950/40 border-amber-900/40" },
+  "WorkSuitability_Collection": { name: "Collecte", color: "text-teal-400 bg-teal-950/40 border-teal-900/40" },
+  "WorkSuitability_Deforest": { name: "Abattage", color: "text-orange-400 bg-orange-950/40 border-orange-900/40" },
+  "WorkSuitability_Mining": { name: "Minage", color: "text-cyan-400 bg-cyan-950/40 border-cyan-900/40" },
+  "WorkSuitability_OilExtraction": { name: "Extraction d'huile", color: "text-slate-400 bg-slate-950/40 border-slate-900/40" },
+  "WorkSuitability_ProductMedicine": { name: "Pharmacie", color: "text-pink-400 bg-pink-950/40 border-pink-900/40" },
+  "WorkSuitability_Cooling": { name: "Refroidissement", color: "text-sky-300 bg-sky-950/40 border-sky-900/40" },
+  "WorkSuitability_Transport": { name: "Transport", color: "text-indigo-400 bg-indigo-950/40 border-indigo-900/40" },
+  "WorkSuitability_MonsterFarm": { name: "Élevage", color: "text-lime-400 bg-lime-950/40 border-lime-900/40" }
+};
+
+// ==========================================
+// COMPOSANT : DÉTAILS DU PAL (FENÊTRE MODALE)
+// ==========================================
+function PalDetailsModal({ pal, onClose }) {
+  if (!pal) return null;
+
+  const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
+  const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      {/* Conteneur de la boîte */}
+      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-white overflow-hidden max-h-[90vh] overflow-y-auto">
+        
+        {/* Bouton de fermeture */}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors bg-slate-950/50 p-2 rounded-full border border-slate-800"
+        >
+          ✕
+        </button>
+
+        {/* En-tête de la fiche */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-mono text-indigo-400 font-extrabold uppercase bg-indigo-950/50 border border-indigo-900/50 px-2.5 py-0.5 rounded-full">
+              Niv. {pal.level}
+            </span>
+            {isLucky && <span className="text-[11px] font-mono text-purple-400 font-extrabold bg-purple-950 border border-purple-900 px-2 py-0.5 rounded-full">LUCKY</span>}
+            {isBoss && <span className="text-[11px] font-mono text-amber-400 font-extrabold bg-amber-950 border border-amber-900 px-2 py-0.5 rounded-full">BOSS</span>}
+          </div>
+          <h3 className="text-2xl font-black tracking-tight text-white">{pal.name}</h3>
+          {pal.name !== pal.type && (
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">{pal.type}</p>
+          )}
+        </div>
+
+        {/* Statistiques de Combat */}
+        <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 mb-6 space-y-3">
+          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Statistiques de combat</h4>
+          
+          {/* HP */}
+          <div>
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Points de vie (PV)</span>
+              <span className="font-bold text-slate-200">{pal.hp || "Inconnu"} {pal.max_hp ? `/ ${pal.max_hp}` : ""}</span>
+            </div>
+            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
+              <div className="bg-emerald-500 h-full rounded-full" style={{ width: pal.hp ? `${Math.min((pal.hp / (pal.max_hp || 5000)) * 100, 100)}%` : '0%' }}></div>
+            </div>
+          </div>
+
+          {/* Attaque */}
+          <div>
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Attaque</span>
+              <span className="font-bold text-slate-200">{pal.attack || "Inconnu"}</span>
+            </div>
+            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
+              <div className="bg-red-500 h-full rounded-full" style={{ width: pal.attack ? `${Math.min((pal.attack / 1000) * 100, 100)}%` : '0%' }}></div>
+            </div>
+          </div>
+
+          {/* Défense */}
+          <div>
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Défense</span>
+              <span className="font-bold text-slate-200">{pal.defense || "Inconnu"}</span>
+            </div>
+            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
+              <div className="bg-blue-500 h-full rounded-full" style={{ width: pal.defense ? `${Math.min((pal.defense / 1000) * 100, 100)}%` : '0%' }}></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Aptitudes au travail */}
+        <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 space-y-3">
+          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Aptitudes de travail</h4>
+          {pal.work_suitabilities && pal.work_suitabilities.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {pal.work_suitabilities.map((suitability, index) => {
+                const spec = WORK_TRANSLATIONS[suitability.suitability] || { name: suitability.suitability, color: "text-slate-300 bg-slate-900 border-slate-800" };
+                return (
+                  <div 
+                    key={index} 
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-2 ${spec.color}`}
+                  >
+                    <span>{spec.name}</span>
+                    <span className="bg-black/30 px-1.5 py-0.5 rounded font-black">Lvl {suitability.level}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 italic py-2">Ce Pal ne possède aucune aptitude spécifique.</p>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ==========================================
 // COMPOSANT : CARTE INDIVIDUELLE DU JOUEUR
 // ==========================================
-function PlayerCard({ player }) {
+function PlayerCard({ player, onSelectPal }) {
   const [isOpen, setIsOpen] = useState(false);
   const [palSearch, setPalSearch] = useState("");
   const [pinnedPalIds, setPinnedPalIds] = useState([]);
 
-  // Charger les favoris/équipe réelle sauvegardés localement pour ce joueur
   useEffect(() => {
     const saved = localStorage.getItem(`pinned_pals_${player.uid}`);
     if (saved) {
@@ -20,13 +139,12 @@ function PlayerCard({ player }) {
     }
   }, [player.uid]);
 
-  // Sauvegarder les épingles
-  const togglePinPal = (palUniqueKey) => {
+  const togglePinPal = (e, palUniqueKey) => {
+    e.stopPropagation(); // Évite d'ouvrir la modale au clic sur l'étoile
     let updated;
     if (pinnedPalIds.includes(palUniqueKey)) {
       updated = pinnedPalIds.filter(id => id !== palUniqueKey);
     } else {
-      // Limite à 5 Pals actifs maximum
       if (pinnedPalIds.length >= 5) return;
       updated = [...pinnedPalIds, palUniqueKey];
     }
@@ -34,27 +152,19 @@ function PlayerCard({ player }) {
     localStorage.setItem(`pinned_pals_${player.uid}`, JSON.stringify(updated));
   };
 
-  // 1. TRI DE TOUS LES PALS PAR NIVEAU DÉCROISSANT
-  // On trie d'abord par niveau (du plus grand au plus petit) avant d'attribuer les clés
-  const sortedPals = [...(player.pals || [])].sort((a, b) => {
-    return (b.level || 0) - (a.level || 0);
-  });
+  const sortedPals = [...(player.pals || [])].sort((a, b) => (b.level || 0) - (a.level || 0));
 
-  // Création des identifiants uniques basés sur la liste triée
   const palsWithKeys = sortedPals.map((pal, idx) => ({
     ...pal,
     uniqueKey: `${pal.type}_${pal.level}_${idx}`
   }));
 
-  // L'équipe active : priorité aux épingles, sinon prend les 5 plus hauts niveaux
   const pinnedPals = palsWithKeys.filter(pal => pinnedPalIds.includes(pal.uniqueKey));
   const activeTeam = pinnedPals.length > 0 ? pinnedPals : palsWithKeys.slice(0, 5);
 
-  // La Palbox contient tout le reste (déjà trié par niveau !)
   const activeKeys = activeTeam.map(p => p.uniqueKey);
   const palbox = palsWithKeys.filter(pal => !activeKeys.includes(pal.uniqueKey));
 
-  // Filtrer la Palbox selon la recherche locale
   const filteredPalbox = palbox.filter(pal => {
     const name = pal.name || pal.type || "";
     return name.toLowerCase().includes(palSearch.toLowerCase());
@@ -63,7 +173,7 @@ function PlayerCard({ player }) {
   return (
     <div className="flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700/80 transition-all duration-300 backdrop-blur-md">
       
-      {/* 1. INFOS PRINCIPALES DU JOUEUR */}
+      {/* 1. INFOS JOUEUR */}
       <div className="flex justify-between items-center mb-6">
         <div className="min-w-0">
           <h3 className="text-xl font-black text-white truncate tracking-wide" title={player.name}>
@@ -80,7 +190,7 @@ function PlayerCard({ player }) {
         </div>
       </div>
 
-      {/* 2. L'ÉQUIPE ACTIVE (Top 5 Niveaux ou Épinglée) */}
+      {/* 2. ÉQUIPE ACTIVE (Cliquable pour ouvrir la modale) */}
       <div className="pt-4 border-t border-slate-800/60">
         <div className="flex justify-between items-center mb-3">
           <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -97,39 +207,54 @@ function PlayerCard({ player }) {
             Aucun Pal dans la boîte.
           </p>
         ) : (
-          <div className="space-y-2">
-            {activeTeam.map((pal, idx) => {
+          <div className="space-y-3">
+            {activeTeam.map((pal) => {
               const hasNickname = pal.name && pal.name !== pal.type;
-              const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_");
+              const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
+              const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
               const isPinned = pinnedPalIds.includes(pal.uniqueKey);
               
               return (
                 <div 
                   key={pal.uniqueKey} 
-                  className="flex justify-between items-center bg-slate-950/40 hover:bg-slate-950/80 px-3.5 py-2.5 rounded-xl border border-slate-850 transition-colors group"
+                  onClick={() => onSelectPal(pal)}
+                  className="flex flex-col bg-slate-950/40 hover:bg-slate-950/90 p-3 rounded-xl border border-slate-850 hover:border-indigo-500/30 transition-all duration-200 cursor-pointer group shadow-sm"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <button 
-                      onClick={() => togglePinPal(pal.uniqueKey)}
-                      className="text-slate-600 hover:text-amber-400 transition-colors"
-                      title={isPinned ? "Désépingler de l'équipe" : "Épingler dans l'équipe active"}
-                    >
-                      <span className={isPinned ? "text-amber-400 text-sm" : "text-slate-700 group-hover:text-slate-500 text-sm"}>★</span>
-                    </button>
-                    <div className="min-w-0">
-                      <p className={`text-sm font-bold truncate ${isBoss ? 'text-amber-400' : 'text-slate-200'}`}>
-                        {pal.name}
-                      </p>
-                      {hasNickname && (
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                          {pal.type}
-                        </p>
-                      )}
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button 
+                        onClick={(e) => togglePinPal(e, pal.uniqueKey)}
+                        className="text-slate-600 hover:text-amber-400 transition-colors shrink-0 z-10"
+                        title={isPinned ? "Désépingler de l'équipe" : "Épingler dans l'équipe active"}
+                      >
+                        <span className={isPinned ? "text-amber-400 text-sm" : "text-slate-700 group-hover:text-slate-500 text-sm"}>★</span>
+                      </button>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-sm font-bold truncate ${isBoss ? 'text-amber-400' : isLucky ? 'text-purple-400' : 'text-slate-200 group-hover:text-white'}`}>
+                            {pal.name}
+                          </p>
+                          {isLucky && <span className="text-[9px] px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded font-black shrink-0">LUCKY</span>}
+                        </div>
+                        {hasNickname && (
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                            {pal.type}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded font-black font-mono border border-slate-700/50 shrink-0">
+                      Lvl {pal.level}
+                    </span>
                   </div>
-                  <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded font-black font-mono border border-slate-700/50">
-                    Lvl {pal.level}
-                  </span>
+
+                  {/* Aperçu rapide des stats */}
+                  {(pal.hp || pal.attack) && (
+                    <div className="mt-2 pt-2 border-t border-slate-900/60 flex gap-4 text-[10px] font-mono text-slate-400">
+                      {pal.hp !== undefined && <span>PV: <strong className="text-slate-300">{pal.hp}</strong></span>}
+                      {pal.attack !== undefined && <span>ATK: <strong className="text-slate-300">{pal.attack}</strong></span>}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -137,7 +262,7 @@ function PlayerCard({ player }) {
         )}
       </div>
 
-      {/* 3. LE CONTENEUR DE LA PALBOX (Déroulant) */}
+      {/* 3. PALBOX (Déroulant) */}
       {player.pals && player.pals.length > 5 && (
         <div className="mt-4 pt-4 border-t border-slate-800/40">
           <button
@@ -160,15 +285,8 @@ function PlayerCard({ player }) {
             </svg>
           </button>
 
-          {/* Section Accordéon */}
           {isOpen && (
-            <div className="mt-4 space-y-3">
-              {/* Message d'aide */}
-              <p className="text-[10px] text-slate-500 italic px-1">
-                Cliquez sur l'étoile ★ d'un Pal pour l'ajouter à votre sélection de 5.
-              </p>
-
-              {/* Filtre interne pour la Palbox */}
+            <div className="mt-4 space-y-3 animate-fade-in">
               <div className="relative">
                 <input
                   type="text"
@@ -182,33 +300,35 @@ function PlayerCard({ player }) {
                 </svg>
               </div>
 
-              {/* Grille de la Palbox */}
-              <div className="max-h-60 overflow-y-auto pr-1 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+              <div className="max-h-60 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                 {filteredPalbox.length === 0 ? (
                   <p className="text-center py-4 text-xs text-slate-600 italic">Aucun Pal trouvé.</p>
                 ) : (
                   filteredPalbox.map((pal) => {
-                    const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_");
+                    const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
                     return (
                       <div 
                         key={pal.uniqueKey} 
-                        className="flex justify-between items-center bg-slate-950/20 hover:bg-slate-950/50 px-3 py-1.5 rounded-lg border border-slate-900 text-xs transition group"
+                        onClick={() => onSelectPal(pal)}
+                        className="flex flex-col bg-slate-950/20 hover:bg-slate-950/50 p-2.5 rounded-lg border border-slate-900 text-xs cursor-pointer hover:border-slate-800 transition group"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <button 
-                            onClick={() => togglePinPal(pal.uniqueKey)}
-                            className="text-slate-800 hover:text-amber-450 transition-colors"
-                            title="Épingler dans l'équipe active"
-                          >
-                            ★
-                          </button>
-                          <span className={`font-semibold truncate max-w-[120px] ${isBoss ? 'text-amber-500/90' : 'text-slate-400'}`}>
-                            {pal.name || pal.type}
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button 
+                              onClick={(e) => togglePinPal(e, pal.uniqueKey)}
+                              className="text-slate-800 hover:text-amber-450 transition-colors shrink-0 z-10"
+                              title="Épingler dans l'équipe active"
+                            >
+                              ★
+                            </button>
+                            <span className={`font-semibold truncate max-w-[120px] ${isBoss ? 'text-amber-500/90' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                              {pal.name || pal.type}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                            Niv. {pal.level}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          Niv. {pal.level}
-                        </span>
                       </div>
                     );
                   })
@@ -230,6 +350,9 @@ export default function PlayersPalsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // État stockant le Pal sélectionné pour l'affichage de la modale
+  const [selectedPal, setSelectedPal] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -290,7 +413,7 @@ export default function PlayersPalsList() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 text-white">
+    <div className="max-w-7xl mx-auto px-4 py-8 text-white relative">
       
       {/* En-tête et Barre de recherche */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pb-6 border-b border-slate-800/80">
@@ -326,9 +449,21 @@ export default function PlayersPalsList() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start">
           {filteredPlayers.map((player) => (
-            <PlayerCard key={player.uid} player={player} />
+            <PlayerCard 
+              key={player.uid} 
+              player={player} 
+              onSelectPal={(pal) => setSelectedPal(pal)}
+            />
           ))}
         </div>
+      )}
+
+      {/* Affichage de la modale au clic d'un Pal */}
+      {selectedPal && (
+        <PalDetailsModal 
+          pal={selectedPal} 
+          onClose={() => setSelectedPal(null)} 
+        />
       )}
     </div>
   );
