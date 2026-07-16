@@ -30,7 +30,7 @@ function App() {
             </NavLink>
             
             <NavLink
-              to="/pals"
+              to="/players"
               className={({ isActive }) =>
                 `px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
                   isActive
@@ -60,7 +60,7 @@ function App() {
               } 
             />
             
-            {/* Route de la liste des Pals */}
+            {/* Route de la liste des joueurs et de leurs Pals */}
             <Route 
               path="/players" 
               element={
