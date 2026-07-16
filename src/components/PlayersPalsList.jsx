@@ -419,11 +419,14 @@ export default function PlayersPalsList() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pb-6 border-b border-slate-800/80">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
-            Registre des Aventuriers
+            Nos Joueurs & leurs Pals
           </h2>
           <p className="text-slate-400 text-sm mt-1.5 flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            Mise à jour en temps réel • <strong className="text-slate-200">{players.length}</strong> explorateurs actifs
+            Mise à jour en temps réel • <strong className="text-slate-200">{players.length}</strong> joueurs actifs
+          </p>
+          <p className="text-slate-500 text-ls mt-1.5">
+            Les données sont encore en construction et peuvent contenir des erreurs. Merci de votre compréhension.
           </p>
         </div>
         
@@ -444,7 +447,7 @@ export default function PlayersPalsList() {
       {/* Grille des cartes Joueurs */}
       {filteredPlayers.length === 0 ? (
         <div className="text-center py-16 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
-          <p className="text-slate-500 text-lg">Aucun aventurier ne correspond à votre recherche.</p>
+          <p className="text-slate-500 text-lg">Aucun joueur ne correspond à votre recherche.</p>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start">

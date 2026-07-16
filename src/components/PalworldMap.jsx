@@ -18,7 +18,34 @@ const MAP_WIDTH = 2048;
 const MAP_HEIGHT = 2048;
 const bounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
 
-// Composant interne pour contrôler la carte (zoom et centrage fluide)
+// --- 1. BASE DE DONNÉES DES POINTS DE TÉLÉPORTATION (Exemples) ---
+// Note : Ajustez les coordonnées gameX et gameY selon les valeurs réelles de votre serveur.
+// (Généralement, les coordonnées affichées en jeu sont multipliées par 1000 en interne)
+const TELEPORT_POINTS = [
+  { id: 'tp_start', name: 'Plateau du Commencement', gameX: -350000, gameY: -250000 },
+  { id: 'tp_desert', name: 'Désert Anide', gameX: 400000, gameY: 350000 },
+  { id: 'tp_volcano', name: 'Mont Obsidienne', gameX: -600000, gameY: -500000 },
+  { id: 'tp_snow', name: 'Montagnes Enneigées', gameX: -100000, gameY: 600000 },
+];
+
+// Icône personnalisée pour les points de TP (Aspect Statue de voyage rapide bleue/cyan)
+const createTPIcon = () => {
+  return L.divIcon({
+    className: 'custom-tp-icon-container',
+    html: `
+      <div class="tp-marker shadow-lg">
+        <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <div class="tp-pulse-ring"></div>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -12]
+  });
+};
+
 function MapController({ targetPosition }) {
   const map = useMap();
 
@@ -35,7 +62,6 @@ function MapController({ targetPosition }) {
     };
   }, [map]);
 
-  // Déplacement fluide vers le joueur sélectionné
   useEffect(() => {
     if (targetPosition) {
       map.flyTo(targetPosition, 1, {
@@ -55,10 +81,11 @@ export default function PalworldMap() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [targetPosition, setTargetPosition] = useState(null);
   
-  // Références pour ouvrir automatiquement le popup du joueur sélectionné
+  // --- 2. ÉTAT POUR AFFICHER / MASQUER LES TP ---
+  const [showTPs, setShowTPs] = useState(true);
+  
   const markerRefs = useRef({});
 
-  // CONSERVATION STRICTE DE TES FORMULES DE CALIBRATION ET OFFSETS
   const gameToMap = (gameX, gameY) => {
     const minX = -1024000;
     const maxX = 1024000;
@@ -90,7 +117,6 @@ export default function PalworldMap() {
     return [y, x];
   };
 
-  // Synchronisation WebSocket
   useEffect(() => {
     const ws = new WebSocket(`${API_CONFIG.WS_BASE_URL}/ws/players`);
     
@@ -111,36 +137,30 @@ export default function PalworldMap() {
     return () => ws.close();
   }, []);
 
-  // Déclencheur au clic sur un joueur dans la barre latérale
   const handlePlayerClick = (player) => {
     const position = gameToMap(player.location_x || 0, player.location_y || 0);
     setTargetPosition(position);
 
-    // Ouvrir automatiquement le popup du marqueur Leaflet correspondant
     const playerKey = player.uid || player.userId;
     if (markerRefs.current[playerKey]) {
       setTimeout(() => {
         markerRefs.current[playerKey].openPopup();
-      }, 500); // Petit délai pour laisser le temps à la carte de commencer sa transition
+      }, 500); 
     }
   };
 
-  // Résolution d'avatar ultra-robuste sans passer par Unavatar (Évite le blocage 403)
   const getPlayerAvatarUrl = (player) => {
     const rawId = player.uid || player.userId || player.steamId || "";
     const steamId = rawId.toString().trim();
     const playerName = player.name || "Player";
 
-    // 1. Si on a un ID de 17 chiffres (Steam64 valide), on interroge directement l'image Steam officielle
     if (steamId.length === 17 && steamId.startsWith("7656")) {
       return `https://images.rep.tf/${steamId}.png`;
     }
 
-    // 2. Si ce n'est pas un ID Steam (ex: Xbox, ID local ou pseudo oLyde), on génère un avatar SVG magnifique à la volée via DiceBear (gratuit et sans CORS/403)
     return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(playerName)}`;
   };
 
-  // Fonction pour générer l'icône Steam personnalisée du joueur sur la carte
   const createPlayerIcon = (player) => {
     const avatarUrl = getPlayerAvatarUrl(player);
     const playerName = player.name || "P";
@@ -168,7 +188,7 @@ export default function PalworldMap() {
   return (
     <div className="relative w-screen h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-hidden">
       
-      {/* HEADER ULTRA MODERNE */}
+      {/* HEADER */}
       <header className="h-16 px-6 bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-800/80 flex justify-between items-center z-[999] shadow-lg shadow-black/20">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-md shadow-amber-500/20">
@@ -180,7 +200,6 @@ export default function PalworldMap() {
           </div>
         </div>
 
-        {/* Statut de la connexion */}
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1.5 rounded-full border border-slate-800/50">
             <span className="relative flex h-2 w-2">
@@ -196,10 +215,9 @@ export default function PalworldMap() {
 
       <div className="flex-1 flex relative overflow-hidden">
         
-        {/* SIDEBAR DYNAMIQUE */}
+        {/* SIDEBAR */}
         <aside className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-80' : 'w-0'} bg-[#0f172a]/95 backdrop-blur-md border-r border-slate-800/85 flex flex-col z-[998] relative shadow-2xl`}>
           
-          {/* Bouton ouvrir/fermer */}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="absolute -right-10 top-4 w-10 h-10 bg-[#0f172a]/95 border-y border-r border-slate-800 flex items-center justify-center rounded-r-lg cursor-pointer text-slate-400 hover:text-amber-500 transition-colors shadow-md z-[1001]"
@@ -216,7 +234,6 @@ export default function PalworldMap() {
                 </div>
               </div>
 
-              {/* Barre de Recherche */}
               <div className="relative mb-4">
                 <input 
                   type="text" 
@@ -227,7 +244,6 @@ export default function PalworldMap() {
                 />
               </div>
 
-              {/* Liste des Joueurs Cliquables */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-500 italic">
@@ -243,7 +259,6 @@ export default function PalworldMap() {
                         onClick={() => handlePlayerClick(player)}
                         className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/50 rounded-lg transition-all group cursor-pointer flex items-center gap-3 active:scale-[0.98]"
                       >
-                        {/* Mini avatar du joueur */}
                         <img 
                           src={avatarUrl} 
                           alt={player.name} 
@@ -297,14 +312,31 @@ export default function PalworldMap() {
               bounds={bounds}
             />
 
-            {/* Contrôles de zoom */}
-            <div className="leaflet-top leaflet-right !mt-4 !mr-4 z-[1000]">
-              <div className="leaflet-bar border-0 shadow-lg">
+            {/* --- 3. CONTRÔLES MAP : BOUTON DE TOGGLE TP & ZOOM --- */}
+            <div className="leaflet-top leaflet-right !mt-4 !mr-4 z-[1000] flex flex-col gap-2">
+              {/* Bouton pour afficher/masquer les TPs */}
+              <button 
+                onClick={() => setShowTPs(!showTPs)}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center border border-slate-800 shadow-lg cursor-pointer transition-all duration-200 ${
+                  showTPs 
+                    ? 'bg-[#0f172a] text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.15)]' 
+                    : 'bg-[#0f172a]/90 text-slate-400 hover:text-white'
+                }`}
+                title={showTPs ? "Masquer les points de TP" : "Afficher les points de TP"}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </button>
+
+              {/* Contrôles de zoom */}
+              <div className="leaflet-bar border-0 shadow-lg flex flex-col">
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-t-lg" title="Zoom in" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomIn')); }}>+</a>
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-b-lg" title="Zoom out" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomOut')); }}>−</a>
               </div>
             </div>
 
+            {/* MARQUEURS DES JOUEURS */}
             {players.map((player) => {
               const position = gameToMap(player.location_x || 0, player.location_y || 0);
               const playerKey = player.uid || player.userId;
@@ -341,6 +373,34 @@ export default function PalworldMap() {
                 </Marker>
               );
             })}
+
+            {/* --- 4. AFFICHAGE CONDITIONNEL DES MARQUEURS TP --- */}
+            {showTPs && TELEPORT_POINTS.map((tp) => {
+              const position = gameToMap(tp.gameX, tp.gameY);
+              return (
+                <Marker 
+                  key={tp.id} 
+                  position={position}
+                  icon={createTPIcon()}
+                >
+                  <Popup className="custom-popup">
+                    <div className="text-slate-100 bg-[#0f172a] border border-slate-800/80 p-2.5 rounded-lg shadow-xl font-sans min-w-[150px]">
+                      <div className="border-b border-slate-800 pb-1 mb-1.5 flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <strong className="text-xs font-bold text-cyan-400">Voyage Rapide</strong>
+                      </div>
+                      <div className="text-sm font-black text-white mb-1">{tp.name}</div>
+                      <div className="text-[9px] font-mono text-slate-500">
+                        Coords : X:{Math.round(tp.gameX / 1000)} | Y:{Math.round(tp.gameY / 1000)}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+
           </MapContainer>
         </div>
       </div>
@@ -433,6 +493,48 @@ export default function PalworldMap() {
           }
           100% {
             transform: scale(1.4);
+            opacity: 0;
+          }
+        }
+
+        /* --- STYLES DESIGN DES TP (Nouveau) --- */
+        .tp-marker {
+          position: relative;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 2.5px solid #22d3ee; /* Cyan */
+          background: #0f172a;
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          z-index: 9;
+        }
+
+        .tp-pulse-ring {
+          position: absolute;
+          top: -3px;
+          left: -3px;
+          right: -3px;
+          bottom: -3px;
+          border: 1.5px solid #06b6d4;
+          border-radius: 50%;
+          animation: tpPulse 2s infinite ease-in-out;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        @keyframes tpPulse {
+          0% {
+            transform: scale(0.95);
+            opacity: 0.8;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 0.3;
+          }
+          100% {
+            transform: scale(1.35);
             opacity: 0;
           }
         }
