@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, ImageOverlay, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { API_CONFIG } from '../config';
 import 'leaflet/dist/leaflet.css';
 
-// Fix robuste pour les marqueurs Leaflet en production (Vite)
+// Fix robuste pour les marqueurs Leaflet génériques
 const DefaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
@@ -18,9 +18,10 @@ const MAP_WIDTH = 2048;
 const MAP_HEIGHT = 2048;
 const bounds = [[0, 0], [MAP_HEIGHT, MAP_WIDTH]];
 
-// Composant interne pour lier les boutons de zoom customisés à Leaflet
-function MapController() {
+// Composant interne pour contrôler la carte (zoom et centrage fluide)
+function MapController({ targetPosition }) {
   const map = useMap();
+
   useEffect(() => {
     const handleZoomIn = () => map.zoomIn();
     const handleZoomOut = () => map.zoomOut();
@@ -34,6 +35,16 @@ function MapController() {
     };
   }, [map]);
 
+  // Déplacement fluide vers le joueur sélectionné
+  useEffect(() => {
+    if (targetPosition) {
+      map.flyTo(targetPosition, 1, {
+        animate: true,
+        duration: 1.5
+      });
+    }
+  }, [targetPosition, map]);
+
   return null;
 }
 
@@ -42,8 +53,12 @@ export default function PalworldMap() {
   const [connected, setConnected] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [targetPosition, setTargetPosition] = useState(null);
+  
+  // Références pour ouvrir automatiquement le popup du joueur sélectionné
+  const markerRefs = useRef({});
 
-  // CONSERVATION STRICTE DE TOUS TES CALCULS DE CALIBRATION ET OFFSETS
+  // CONSERVATION STRICTE DE TES FORMULES DE CALIBRATION ET OFFSETS
   const gameToMap = (gameX, gameY) => {
     const minX = -1024000;
     const maxX = 1024000;
@@ -75,17 +90,12 @@ export default function PalworldMap() {
     return [y, x];
   };
 
-  // Synchronisation WebSocket temps réel avec ton nouveau backend REST API
+  // Synchronisation WebSocket
   useEffect(() => {
     const ws = new WebSocket(`${API_CONFIG.WS_BASE_URL}/ws/players`);
     
-    ws.onopen = () => {
-      setConnected(true);
-    };
-    
-    ws.onclose = () => {
-      setConnected(false);
-    };
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
     
     ws.onmessage = (event) => {
       try {
@@ -100,6 +110,56 @@ export default function PalworldMap() {
     
     return () => ws.close();
   }, []);
+
+  // Déclencheur au clic sur un joueur dans la barre latérale
+  const handlePlayerClick = (player) => {
+    const position = gameToMap(player.location_x || 0, player.location_y || 0);
+    setTargetPosition(position);
+
+    // Ouvrir automatiquement le popup du marqueur Leaflet correspondant
+    const playerKey = player.uid || player.userId;
+    if (markerRefs.current[playerKey]) {
+      setTimeout(() => {
+        markerRefs.current[playerKey].openPopup();
+      }, 500); // Petit délai pour laisser le temps à la carte de commencer sa transition
+    }
+  };
+
+  // Résolution d'avatar ultra-robuste sans passer par Unavatar (Évite le blocage 403)
+  const getPlayerAvatarUrl = (player) => {
+    const rawId = player.uid || player.userId || player.steamId || "";
+    const steamId = rawId.toString().trim();
+    const playerName = player.name || "Player";
+
+    // 1. Si on a un ID de 17 chiffres (Steam64 valide), on interroge directement l'image Steam officielle
+    if (steamId.length === 17 && steamId.startsWith("7656")) {
+      return `https://images.rep.tf/${steamId}.png`;
+    }
+
+    // 2. Si ce n'est pas un ID Steam (ex: Xbox, ID local ou pseudo oLyde), on génère un avatar SVG magnifique à la volée via DiceBear (gratuit et sans CORS/403)
+    return `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(playerName)}`;
+  };
+
+  // Fonction pour générer l'icône Steam personnalisée du joueur sur la carte
+  const createPlayerIcon = (player) => {
+    const avatarUrl = getPlayerAvatarUrl(player);
+    const playerName = player.name || "P";
+    const firstLetter = playerName.charAt(0).toUpperCase();
+
+    return L.divIcon({
+      className: 'custom-player-icon-container',
+      html: `
+        <div class="player-avatar-wrapper shadow-lg">
+          <img src="${avatarUrl}" alt="${playerName}" class="player-avatar-img" onerror="this.onerror=null; this.src='https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg';" />
+          <div class="player-avatar-fallback">${firstLetter}</div>
+          <div class="player-pulse-ring"></div>
+        </div>
+      `,
+      iconSize: [42, 42],
+      iconAnchor: [21, 21],
+      popupAnchor: [0, -20]
+    });
+  };
 
   const filteredPlayers = players.filter(p => 
     p?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false
@@ -167,34 +227,51 @@ export default function PalworldMap() {
                 />
               </div>
 
-              {/* Liste des Joueurs */}
+              {/* Liste des Joueurs Cliquables */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-500 italic">
                     Aucun joueur trouvé
                   </div>
                 ) : (
-                  filteredPlayers.map((player) => (
-                    <div 
-                      key={player.uid || player.userId}
-                      className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/30 rounded-lg transition-all group"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-bold text-sm text-slate-200 group-hover:text-amber-400 transition-colors">
-                          {player.name ?? "Joueur inconnu"}
-                        </span>
-                        <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
-                          LVL {player.level}
-                        </span>
+                  filteredPlayers.map((player) => {
+                    const avatarUrl = getPlayerAvatarUrl(player);
+
+                    return (
+                      <div 
+                        key={player.uid || player.userId}
+                        onClick={() => handlePlayerClick(player)}
+                        className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800/40 hover:border-amber-500/50 rounded-lg transition-all group cursor-pointer flex items-center gap-3 active:scale-[0.98]"
+                      >
+                        {/* Mini avatar du joueur */}
+                        <img 
+                          src={avatarUrl} 
+                          alt={player.name} 
+                          className="w-8 h-8 rounded-full border border-slate-700/60 group-hover:border-amber-500/60 transition-colors object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg";
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-0.5">
+                            <span className="font-bold text-sm text-slate-200 group-hover:text-amber-400 transition-colors truncate">
+                              {player.name ?? "Joueur inconnu"}
+                            </span>
+                            <span className="bg-amber-500/10 text-amber-500 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
+                              LVL {player.level}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+                            <span>X: {Math.round(player.location_x || 0)} | Y: {Math.round(player.location_y || 0)}</span>
+                            {player.ping !== undefined && (
+                              <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
-                        <span>X: {Math.round(player.location_x || 0)} | Y: {Math.round(player.location_y || 0)}</span>
-                        {player.ping !== undefined && (
-                          <span className="text-emerald-500/80">{Math.round(player.ping)}ms</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -214,13 +291,13 @@ export default function PalworldMap() {
             style={{ height: '100%', width: '100%', position: 'absolute' }}
             className="w-full h-full"
           >
-            <MapController />
+            <MapController targetPosition={targetPosition} />
             <ImageOverlay
               url="palpagos.webp"
               bounds={bounds}
             />
 
-            {/* Repositionnement manuel des contrôles de zoom */}
+            {/* Contrôles de zoom */}
             <div className="leaflet-top leaflet-right !mt-4 !mr-4 z-[1000]">
               <div className="leaflet-bar border-0 shadow-lg">
                 <a href="#" className="!bg-[#0f172a] !text-white !border-slate-800 hover:!bg-amber-500 hover:!text-slate-950 transition-colors !flex !items-center !justify-center !w-10 !h-10 !rounded-t-lg" title="Zoom in" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new Event('zoomIn')); }}>+</a>
@@ -230,8 +307,17 @@ export default function PalworldMap() {
 
             {players.map((player) => {
               const position = gameToMap(player.location_x || 0, player.location_y || 0);
+              const playerKey = player.uid || player.userId;
+
               return (
-                <Marker key={player.uid || player.userId} position={position}>
+                <Marker 
+                  key={playerKey} 
+                  position={position}
+                  icon={createPlayerIcon(player)}
+                  ref={(el) => {
+                    if (el) markerRefs.current[playerKey] = el;
+                  }}
+                >
                   <Popup className="custom-popup">
                     <div className="text-slate-100 bg-[#0f172a] border border-slate-800 p-2 rounded-lg shadow-xl font-sans min-w-[140px]">
                       <div className="border-b border-slate-800 pb-1 mb-1.5 flex justify-between items-center">
@@ -288,6 +374,67 @@ export default function PalworldMap() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #f59e0b;
+        }
+
+        /* Styles de l'avatar circulaire du joueur */
+        .player-avatar-wrapper {
+          position: relative;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          border: 2px solid #f59e0b;
+          background: #0f172a;
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          z-index: 10;
+        }
+
+        .player-avatar-img {
+          width: 100% !important;
+          height: 100% !important;
+          border-radius: 50% !important;
+          object-fit: cover !important;
+          display: block !important;
+        }
+
+        /* Fallback si l'avatar ne se charge pas */
+        .player-avatar-fallback {
+          display: none;
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background: #1e293b;
+          color: #f59e0b;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          font-size: 14px;
+        }
+
+        /* Effet d'onde radar animée autour de l'avatar du joueur */
+        .player-pulse-ring {
+          position: absolute;
+          top: -4px;
+          left: -4px;
+          right: -4px;
+          bottom: -4px;
+          border: 2px solid #f59e0b;
+          border-radius: 50%;
+          animation: playerPulse 1.8s infinite ease-out;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        @keyframes playerPulse {
+          0% {
+            transform: scale(0.9);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.4);
+            opacity: 0;
+          }
         }
       `}</style>
     </div>
