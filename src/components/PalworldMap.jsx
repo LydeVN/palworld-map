@@ -279,7 +279,7 @@ export default function PalworldMap() {
         </aside>
 
         {/* CONTAINER DE LA CARTE */}
-        <div className="flex-1 h-full relative bg-[#090d16]">
+        <div className="flex-1 h-full relative bg-[#0C161E]">
           <MapContainer
             crs={L.CRS.Simple}
             bounds={bounds}
@@ -347,7 +347,7 @@ export default function PalworldMap() {
 
       <style>{`
         .leaflet-container {
-          background: #090d16 !important;
+          background: #0C161E !important;
         }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
           background: transparent !important;
