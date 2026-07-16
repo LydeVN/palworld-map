@@ -27,13 +27,13 @@ export default function Home() {
         {/* Badge Nouveauté */}
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full mb-6 animate-pulse">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Mise à jour v0.3.1 Active</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500"> v0.3.1</span>
         </div>
 
         {/* Titre Principal */}
-        <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white uppercase leading-none mb-6">
+        <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white uppercase leading-none mb-6">
           Suivez vos aventures <br />
-          sur <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600">Palpagos</span> en temps réel
+          sur le serveur <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600">OPAL</span> en temps réel
         </h2>
 
         {/* Description courte */}
@@ -51,14 +51,14 @@ export default function Home() {
           </button>
           
           <button 
-            onClick={() => window.location.href = "/construction"} // Redirige vers ta page construction ou "/players"
+            onClick={() => window.location.href = "/players"} // Redirige vers ta page construction ou "/players"
             className="w-full sm:w-1/3 px-6 py-4 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
           >
             👥 Joueurs
           </button>
 
           <button 
-            onClick={() => window.location.href = "/construction"} // Redirige vers ta page construction ou "/paldex"
+            onClick={() => window.location.href = "/paldex"} // Redirige vers ta page construction ou "/paldex"
             className="w-full sm:w-1/3 px-6 py-4 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
           >
             📖 Paldex
