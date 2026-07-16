@@ -61,7 +61,7 @@ function App() {
             <Route path="/players" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PlayersPalsList /></div>} />
             
             {/* Nouvelle route Paldex */}
-            <Route path="/paldex" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><Paldex /></div>} />
+            {/* <Route path="/paldex" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><Paldex /></div>} /> */}
 
             <Route path="*" element={<Navigate to="/map" replace />} />
           </Routes>
