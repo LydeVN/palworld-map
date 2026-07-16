@@ -62,7 +62,7 @@ function App() {
             
             {/* Route de la liste des Pals */}
             <Route 
-              path="/pals" 
+              path="/players" 
               element={
                 <div className="w-full h-full overflow-y-auto bg-slate-950">
                   <PlayersPalsList />
