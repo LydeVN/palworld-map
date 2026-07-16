@@ -1,26 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { API_CONFIG } from '../config';
+import React from 'react';
 
 export default function Home() {
-  const [serverStats, setServerStats] = useState({ online: false, playersCount: 0 });
-
-  // Simuler ou récupérer l'état de connexion via ton API
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        // Optionnel : remplace par un vrai fetch sur ton API
-        // const res = await fetch(`${API_CONFIG.BASE_URL}/api/status`);
-        // const data = await res.json();
-        // setServerStats({ online: true, playersCount: data.online_players });
-        
-        setServerStats({ online: true, playersCount: 3 }); // Valeurs simulées temporaires
-      } catch (err) {
-        setServerStats({ online: false, playersCount: 0 });
-      }
-    };
-    checkServer();
-  }, []);
-
   return (
     <div className="relative min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans overflow-x-hidden">
       
@@ -38,17 +18,6 @@ export default function Home() {
             <h1 className="text-sm font-bold tracking-wider text-white uppercase">Palworld</h1>
             <p className="text-[10px] text-amber-500 font-mono tracking-widest font-semibold uppercase">Community Platform</p>
           </div>
-        </div>
-
-        {/* Statut du Serveur en Direct */}
-        <div className="flex items-center gap-2 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-800/80 shadow-inner">
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${serverStats.online ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${serverStats.online ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-          </span>
-          <span className="text-xs font-mono text-slate-300">
-            {serverStats.online ? `SERVEUR EN LIGNE (${serverStats.playersCount} JOUEURS)` : 'SERVEUR HORS-LIGNE'}
-          </span>
         </div>
       </header>
 
@@ -69,59 +38,75 @@ export default function Home() {
 
         {/* Description courte */}
         <p className="text-base md:text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Visualisez la position en direct de vos alliés (et de vos rivaux), analysez leurs statistiques et explorez la carte interactive mise à jour instantanément.
+          Visualisez la position en temps réel de vos alliés, analysez la liste des survivants et découvrez l'intégralité du Paldex de l'île.
         </p>
 
-        {/* Bouton d'action principal */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20 w-full">
+        {/* Boutons d'action principaux vers les vraies pages */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20 w-full max-w-2xl">
           <button 
-            onClick={() => window.location.href = "/map"} // Modifie la route selon ton système (ex: React Router, href, etc.)
-            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl shadow-xl shadow-amber-500/20 hover:shadow-amber-500/45 hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer"
+            onClick={() => window.location.href = "/map"} 
+            className="w-full sm:w-1/3 px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl shadow-xl shadow-amber-500/20 hover:shadow-amber-500/45 hover:scale-[1.03] active:scale-[0.98] transition-all cursor-pointer"
           >
-            🗺️ Ouvrir la carte Live
+            🗺️ Carte Live
           </button>
           
           <button 
-            onClick={() => window.location.href = "/construction"} 
-            className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+            onClick={() => window.location.href = "/construction"} // Redirige vers ta page construction ou "/players"
+            className="w-full sm:w-1/3 px-6 py-4 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
           >
-            Statistiques globales
+            👥 Joueurs
+          </button>
+
+          <button 
+            onClick={() => window.location.href = "/construction"} // Redirige vers ta page construction ou "/paldex"
+            className="w-full sm:w-1/3 px-6 py-4 bg-slate-900 hover:bg-slate-850 text-slate-200 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+          >
+            📖 Paldex
           </button>
         </div>
 
-        {/* GRID DE FONCTIONNALITÉS */}
+        {/* GRID DE PRÉSENTATION DES PAGES RÉELLES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full text-left">
           
-          {/* Carte 1 */}
-          <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/30 transition-all group backdrop-blur-sm">
+          {/* Carte 1 : MAP */}
+          <div 
+            onClick={() => window.location.href = "/map"}
+            className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/40 hover:bg-slate-900/60 transition-all group backdrop-blur-sm cursor-pointer"
+          >
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
-              📡
+              🗺️
             </div>
-            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Radar WebSocket</h3>
+            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Carte Interactive</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Vos coordonnées s'actualisent sans latence sur la carte grâce à une connexion socket persistante et optimisée.
+              Suivez les coordonnées et positions de l'ensemble des joueurs en ligne synchronisées en direct.
             </p>
           </div>
 
-          {/* Carte 2 */}
-          <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/30 transition-all group backdrop-blur-sm">
+          {/* Carte 2 : JOUEURS */}
+          <div 
+            onClick={() => window.location.href = "/construction"}
+            className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/40 hover:bg-slate-900/60 transition-all group backdrop-blur-sm cursor-pointer"
+          >
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
-              👤
+              👥
             </div>
-            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Profils Steam Directs</h3>
+            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Liste des Joueurs</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Récupération et mise en cache automatiques des avatars officiels des joueurs pour une immersion visuelle totale.
+              Consultez l'historique des survivants, leurs niveaux respectifs ainsi que les profils de la communauté.
             </p>
           </div>
 
-          {/* Carte 3 */}
-          <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/30 transition-all group backdrop-blur-sm">
+          {/* Carte 3 : PALDEX */}
+          <div 
+            onClick={() => window.location.href = "/construction"}
+            className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl hover:border-amber-500/40 hover:bg-slate-900/60 transition-all group backdrop-blur-sm cursor-pointer"
+          >
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
-              ⚔️
+              📖
             </div>
-            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Suivi des Niveaux</h3>
+            <h3 className="text-md font-bold text-white mb-2 group-hover:text-amber-400 transition-colors">Encyclopédie Paldex</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Consultez le niveau, le ping et la localisation précise de chaque survivant actuellement connecté sur le serveur.
+              Explorez le registre des Pals pour connaître leurs caractéristiques, éléments, types et compétences de travail.
             </p>
           </div>
 

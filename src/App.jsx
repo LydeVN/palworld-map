@@ -19,6 +19,16 @@ function App() {
           
           <nav className="flex gap-2">
             <NavLink
+              to="/home"
+              className={({ isActive }) =>
+                `px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                  isActive ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`
+              }
+            >
+              Accueil
+            </NavLink>
+            <NavLink
               to="/map"
               className={({ isActive }) =>
                 `px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
