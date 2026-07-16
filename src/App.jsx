@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react
 import PalworldMap from './components/PalworldMap';
 import PlayersPalsList from './components/PlayersPalsList';
 import Paldex from './components/Paldex'; // <--- Importation du nouveau composant
+import UnderConstruction from './components/UnderConstruction'; // <--- Importation du nouveau composant
 
 function App() {
   return (
@@ -63,7 +64,7 @@ function App() {
             {/* Nouvelle route Paldex */}
             {/* <Route path="/paldex" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><Paldex /></div>} /> */}
 
-            <Route path="*" element={<Navigate to="/map" replace />} />
+            <Route path="*" element={<UnderConstruction />} />
           </Routes>
         </div>
 
