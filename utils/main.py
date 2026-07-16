@@ -172,11 +172,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Palworld Live Map API", lifespan=lifespan)
 
+# On configure les origines autorisées en dur pour éviter tout problème de parsing du .env
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=[
+        "https://opal.lydecorp.fr",
+        "http://localhost:5173" # Optionnel : pour tes tests en local si besoin
+    ],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
