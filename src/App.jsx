@@ -40,7 +40,7 @@ function App() {
               }
             >
               Membres & Pals
-            </navLink>
+            </NavLink>
           </nav>
         </header>
 
