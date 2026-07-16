@@ -425,7 +425,7 @@ export default function PlayersPalsList() {
             <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
             Mise à jour en temps réel • <strong className="text-slate-200">{players.length}</strong> joueurs actifs
           </p>
-          <p className="text-slate-500 text-ls mt-1.5">
+          <p className="text-red-500 text-ls mt-1.5">
             Les données sont encore en construction et peuvent contenir des erreurs. Merci de votre compréhension.
           </p>
         </div>
