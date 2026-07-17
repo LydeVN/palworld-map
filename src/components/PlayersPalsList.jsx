@@ -12,10 +12,23 @@ const WORK_TRANSLATIONS = {
   "WorkSuitability_Mining": { name: "Minage", color: "text-cyan-400 bg-cyan-950/40 border-cyan-900/40" },
   "WorkSuitability_OilExtraction": { name: "Extraction d'huile", color: "text-slate-400 bg-slate-950/40 border-slate-900/40" },
   "WorkSuitability_ProductMedicine": { name: "Pharmacie", color: "text-pink-400 bg-pink-950/40 border-pink-900/40" },
-  "WorkSuitability_Cooling": { name: "Refroidissement", color: "text-sky-300 bg-sky-950/40 border-sky-900/40" },
+  "WorkSuitability_Cooling": { name: "Refroidissement", color: "text-sky-300 bg-sky-950/40 border-sky-300/10" },
   "WorkSuitability_Transport": { name: "Transport", color: "text-indigo-400 bg-indigo-950/40 border-indigo-900/40" },
   "WorkSuitability_MonsterFarm": { name: "Élevage", color: "text-lime-400 bg-lime-950/40 border-lime-900/40" }
 };
+
+// Fonction de calcul de la statistique de base pure d'origine
+function getPureSpeciesStat(statValue, level, isHp = false) {
+  if (!statValue || !level) return 0;
+  
+  // Correction des PV stockés en x1000 dans Palworld
+  const realValue = isHp ? statValue / 1000 : statValue;
+  
+  // Formule inverse de montée de niveau : Stat = Base + (Base * 0.1 * (Niv - 1))
+  const rawBase = realValue / (1 + 0.1 * (level - 1));
+  
+  return Math.round(rawBase);
+}
 
 // ==========================================
 // COMPOSANT : DÉTAILS DU PAL (FENÊTRE MODALE)
@@ -26,9 +39,13 @@ function PalDetailsModal({ pal, onClose }) {
   const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
   const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
 
+  // Calcul des statistiques de base réelles de l'espèce sans modificateur
+  const baseHp = getPureSpeciesStat(pal.hp, pal.level, true);
+  const baseAttack = getPureSpeciesStat(pal.attack, pal.level, false);
+  const baseDefense = getPureSpeciesStat(pal.defense, pal.level, false);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      {/* Conteneur de la boîte */}
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-white overflow-hidden max-h-[90vh] overflow-y-auto">
         
         {/* Bouton de fermeture */}
@@ -39,7 +56,7 @@ function PalDetailsModal({ pal, onClose }) {
           ✕
         </button>
 
-        {/* En-tête de la fiche */}
+        {/* En-tête */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[11px] font-mono text-indigo-400 font-extrabold uppercase bg-indigo-950/50 border border-indigo-900/50 px-2.5 py-0.5 rounded-full">
@@ -48,46 +65,46 @@ function PalDetailsModal({ pal, onClose }) {
             {isLucky && <span className="text-[11px] font-mono text-purple-400 font-extrabold bg-purple-950 border border-purple-900 px-2 py-0.5 rounded-full">LUCKY</span>}
             {isBoss && <span className="text-[11px] font-mono text-amber-400 font-extrabold bg-amber-950 border border-amber-900 px-2 py-0.5 rounded-full">BOSS</span>}
           </div>
-          <h3 className="text-2xl font-black tracking-tight text-white">{pal.name}</h3>
+          <h3 className="text-2xl font-black tracking-tight text-white">{pal.name || pal.type}</h3>
           {pal.name !== pal.type && (
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">{pal.type}</p>
           )}
         </div>
 
-        {/* Statistiques de Combat */}
+        {/* Statistiques de Base de l'espèce */}
         <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 mb-6 space-y-3">
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Statistiques de combat</h4>
+          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Statistiques de Base de l'espèce (Sans niveau)</h4>
           
-          {/* HP */}
+          {/* PV de base */}
           <div>
             <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Points de vie (PV)</span>
-              <span className="font-bold text-slate-200">{pal.hp || "Inconnu"} {pal.max_hp ? `/ ${pal.max_hp}` : ""}</span>
+              <span>PV de base</span>
+              <span className="font-bold text-slate-200">{baseHp || "Inconnu"}</span>
             </div>
             <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-emerald-500 h-full rounded-full" style={{ width: pal.hp ? `${Math.min((pal.hp / (pal.max_hp || 5000)) * 100, 100)}%` : '0%' }}></div>
+              <div className="bg-emerald-500 h-full rounded-full" style={{ width: baseHp ? `${Math.min((baseHp / 200) * 100, 100)}%` : '0%' }}></div>
             </div>
           </div>
 
-          {/* Attaque */}
+          {/* Attaque de base */}
           <div>
             <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Attaque</span>
-              <span className="font-bold text-slate-200">{pal.attack || "Inconnu"}</span>
+              <span>Attaque de base</span>
+              <span className="font-bold text-slate-200">{baseAttack || "Inconnu"}</span>
             </div>
             <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-red-500 h-full rounded-full" style={{ width: pal.attack ? `${Math.min((pal.attack / 1000) * 100, 100)}%` : '0%' }}></div>
+              <div className="bg-red-500 h-full rounded-full" style={{ width: baseAttack ? `${Math.min((baseAttack / 200) * 100, 100)}%` : '0%' }}></div>
             </div>
           </div>
 
-          {/* Défense */}
+          {/* Défense de base */}
           <div>
             <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Défense</span>
-              <span className="font-bold text-slate-200">{pal.defense || "Inconnu"}</span>
+              <span>Défense de base</span>
+              <span className="font-bold text-slate-200">{baseDefense || "Inconnu"}</span>
             </div>
             <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-blue-500 h-full rounded-full" style={{ width: pal.defense ? `${Math.min((pal.defense / 1000) * 100, 100)}%` : '0%' }}></div>
+              <div className="bg-blue-500 h-full rounded-full" style={{ width: baseDefense ? `${Math.min((baseDefense / 200) * 100, 100)}%` : '0%' }}></div>
             </div>
           </div>
         </div>
@@ -140,7 +157,7 @@ function PlayerCard({ player, onSelectPal }) {
   }, [player.uid]);
 
   const togglePinPal = (e, palUniqueKey) => {
-    e.stopPropagation(); // Évite d'ouvrir la modale au clic sur l'étoile
+    e.stopPropagation();
     let updated;
     if (pinnedPalIds.includes(palUniqueKey)) {
       updated = pinnedPalIds.filter(id => id !== palUniqueKey);
@@ -173,7 +190,7 @@ function PlayerCard({ player, onSelectPal }) {
   return (
     <div className="flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700/80 transition-all duration-300 backdrop-blur-md">
       
-      {/* 1. INFOS JOUEUR */}
+      {/* Infos Joueur */}
       <div className="flex justify-between items-center mb-6">
         <div className="min-w-0">
           <h3 className="text-xl font-black text-white truncate tracking-wide" title={player.name}>
@@ -190,7 +207,7 @@ function PlayerCard({ player, onSelectPal }) {
         </div>
       </div>
 
-      {/* 2. ÉQUIPE ACTIVE (Cliquable pour ouvrir la modale) */}
+      {/* Équipe active */}
       <div className="pt-4 border-t border-slate-800/60">
         <div className="flex justify-between items-center mb-3">
           <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -214,6 +231,11 @@ function PlayerCard({ player, onSelectPal }) {
               const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
               const isPinned = pinnedPalIds.includes(pal.uniqueKey);
               
+              // Calcul des stats de base pures de l'espèce
+              const baseHp = getPureSpeciesStat(pal.hp, pal.level, true);
+              const baseAttack = getPureSpeciesStat(pal.attack, pal.level, false);
+              const baseDefense = getPureSpeciesStat(pal.defense, pal.level, false);
+
               return (
                 <div 
                   key={pal.uniqueKey} 
@@ -232,7 +254,7 @@ function PlayerCard({ player, onSelectPal }) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className={`text-sm font-bold truncate ${isBoss ? 'text-amber-400' : isLucky ? 'text-purple-400' : 'text-slate-200 group-hover:text-white'}`}>
-                            {pal.name}
+                            {pal.name || pal.type}
                           </p>
                           {isLucky && <span className="text-[9px] px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded font-black shrink-0">LUCKY</span>}
                         </div>
@@ -248,11 +270,12 @@ function PlayerCard({ player, onSelectPal }) {
                     </span>
                   </div>
 
-                  {/* Aperçu rapide des stats */}
-                  {(pal.hp || pal.attack) && (
+                  {/* Statistiques de base pures */}
+                  {(baseHp || baseAttack || baseDefense) && (
                     <div className="mt-2 pt-2 border-t border-slate-900/60 flex gap-4 text-[10px] font-mono text-slate-400">
-                      {pal.hp !== undefined && <span>PV: <strong className="text-slate-300">{pal.hp}</strong></span>}
-                      {pal.attack !== undefined && <span>ATK: <strong className="text-slate-300">{pal.attack}</strong></span>}
+                      {baseHp && <span>PV Base: <strong className="text-slate-300">{baseHp}</strong></span>}
+                      {baseAttack && <span>ATK Base: <strong className="text-slate-300">{baseAttack}</strong></span>}
+                      {baseDefense && <span>DEF Base: <strong className="text-slate-300">{baseDefense}</strong></span>}
                     </div>
                   )}
                 </div>
@@ -262,7 +285,7 @@ function PlayerCard({ player, onSelectPal }) {
         )}
       </div>
 
-      {/* 3. PALBOX (Déroulant) */}
+      {/* Palbox */}
       {player.pals && player.pals.length > 5 && (
         <div className="mt-4 pt-4 border-t border-slate-800/40">
           <button
@@ -350,8 +373,6 @@ export default function PlayersPalsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // État stockant le Pal sélectionné pour l'affichage de la modale
   const [selectedPal, setSelectedPal] = useState(null);
 
   const fetchData = async () => {
@@ -425,7 +446,7 @@ export default function PlayersPalsList() {
             <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
             Mise à jour en temps réel • <strong className="text-slate-200">{players.length}</strong> joueurs actifs
           </p>
-          <p className="text-red-500 text-ls mt-1.5">
+          <p className="text-red-500 text-xs mt-1.5">
             Les données sont encore en construction et peuvent contenir des erreurs. Merci de votre compréhension.
           </p>
         </div>

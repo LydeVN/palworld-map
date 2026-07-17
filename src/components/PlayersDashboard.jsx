@@ -113,7 +113,7 @@ export default function PalworldMap() {
 
   // Création d'une icône Leaflet personnalisée avec l'avatar Twitch
   const createTwitchIcon = (username, userId) => {
-    const safeName = username || "Aventurier";
+    const safeName = username || "Joueurs";
     const avatarUrl = avatars[userId] || `https://ui-avatars.com/api/?name=${encodeURIComponent(safeName)}&background=f59e0b&color=0f172a&bold=true`;
     
     return L.divIcon({

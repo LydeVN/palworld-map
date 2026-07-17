@@ -4,7 +4,8 @@ import PalworldMap from './components/PalworldMap';
 import PlayersPalsList from './components/PlayersPalsList';
 import Paldex from './components/Paldex'; // <--- Importation du nouveau composant
 import UnderConstruction from './components/UnderConstruction'; // <--- Importation du nouveau composant
-import Home from './components/Home'; // <--- Importation du composant Home
+import Home from './components/Home'; // <--- Importation du composant Home 
+import PalBuildPlaner from './components/PalBuildPlaner'; // <--- Importation du composant Home 
 
 function App() {
   return (
@@ -72,6 +73,8 @@ function App() {
             <Route path="/home" element={<div className="w-full h-full"><Home /></div>} />
             <Route path="/map" element={<div className="w-full h-full"><PalworldMap /></div>} />
             <Route path="/players" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PlayersPalsList /></div>} />
+            <Route path="/stats" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PalBuildPlaner /></div>} />
+
             
             {/* Nouvelle route Paldex */}
             {/* <Route path="/paldex" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><Paldex /></div>} /> */}
