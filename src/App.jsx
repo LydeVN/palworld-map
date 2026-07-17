@@ -72,8 +72,8 @@ function App() {
             
             <Route path="/home" element={<div className="w-full h-full"><Home /></div>} />
             <Route path="/map" element={<div className="w-full h-full"><PalworldMap /></div>} />
-            <Route path="/players" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PlayersPalsList /></div>} />
-            <Route path="/stats" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PalBuildPlaner /></div>} />
+            {/* <Route path="/players" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PlayersPalsList /></div>} /> */}
+            {/* <Route path="/stats" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PalBuildPlaner /></div>} /> */}
 
             
             {/* Nouvelle route Paldex */}
