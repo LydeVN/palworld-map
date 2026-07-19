@@ -61,7 +61,7 @@ export default function PalworldMap() {
 
   // --- FILTRES DE VISIBILITÉ ---
   const [showTP, setShowTP] = useState(true);
-  const [showBosses, setShowBosses] = useState(true);
+  const [showBosses, setShowBosses] = useState(false);
   const [showEffigies, setShowEffigies] = useState(false);
 
   const markerRefs = useRef({});
