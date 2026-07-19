@@ -6,6 +6,7 @@ import Paldex from './components/Paldex'; // <--- Importation du nouveau composa
 import UnderConstruction from './components/UnderConstruction'; // <--- Importation du nouveau composant
 import Home from './components/Home'; // <--- Importation du composant Home 
 import PalBuildPlaner from './components/PalBuildPlaner'; // <--- Importation du composant Home 
+import PalworldTechnologies from './components/PalworldTechnologies'
 
 function App() {
   return (
@@ -62,6 +63,19 @@ function App() {
             >
               Paldex
             </NavLink>
+
+            {/* Nouveau bouton Technologie */}
+            <NavLink
+              to="/technologies"
+              className={({ isActive }) =>
+                `px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                  isActive ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`
+              }
+            >
+              Technologies
+            </NavLink>
+
           </nav>
         </header>
 
@@ -73,6 +87,7 @@ function App() {
             <Route path="/home" element={<div className="w-full h-full"><Home /></div>} />
             <Route path="/map" element={<div className="w-full h-full"><PalworldMap /></div>} />
             <Route path="/players" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PlayersPalsList /></div>} />
+            <Route path="/technologies" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PalworldTechnologies /></div>} />
             <Route path="/stats" element={<div className="w-full h-full overflow-y-auto bg-slate-950"><PalBuildPlaner /></div>} />
 
             

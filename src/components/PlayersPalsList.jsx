@@ -17,121 +17,55 @@ const WORK_TRANSLATIONS = {
   "WorkSuitability_MonsterFarm": { name: "Élevage", color: "text-lime-400 bg-lime-950/40 border-lime-900/40" }
 };
 
-// Fonction de calcul de la statistique de base pure d'origine
 function getPureSpeciesStat(statValue, level, isHp = false) {
   if (!statValue || !level) return 0;
-  
-  // Correction des PV stockés en x1000 dans Palworld
   const realValue = isHp ? statValue / 1000 : statValue;
-  
-  // Formule inverse de montée de niveau : Stat = Base + (Base * 0.1 * (Niv - 1))
-  const rawBase = realValue / (1 + 0.1 * (level - 1));
-  
-  return Math.round(rawBase);
+  return Math.round(realValue / (1 + 0.1 * (level - 1)));
 }
 
 // ==========================================
 // COMPOSANT : DÉTAILS DU PAL (FENÊTRE MODALE)
 // ==========================================
-function PalDetailsModal({ pal, onClose }) {
+function PalDetailsModal({ pal, onClose, getPalNameAndIcon }) {
   if (!pal) return null;
 
-  const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
+  const isBoss = pal.name?.includes("(Boss)") || pal.type?.includes("(Boss)") || pal.is_boss;
   const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
 
-  // Calcul des statistiques de base réelles de l'espèce sans modificateur
   const baseHp = getPureSpeciesStat(pal.hp, pal.level, true);
   const baseAttack = getPureSpeciesStat(pal.attack, pal.level, false);
-  const baseDefense = getPureSpeciesStat(pal.defense, pal.level, false);
+
+  const { displayName, iconUrl } = getPalNameAndIcon(pal.type, pal.name);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-white overflow-hidden max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl text-white max-h-[90vh] overflow-y-auto">
+        <button onClick={onClose} className="absolute top-5 right-5 text-slate-400 hover:text-white bg-slate-950/50 p-3 rounded-full border border-slate-800 text-lg">✕</button>
+        <div className="flex items-center gap-6 mb-8">
+          <div className="w-28 h-28 bg-slate-950 border-2 border-slate-800 rounded-2xl p-2 shrink-0 flex items-center justify-center">
+            <img src={iconUrl} alt={displayName} className="w-full h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/img/unknown.webp'; }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="text-xs font-mono text-indigo-400 font-extrabold uppercase bg-indigo-950/60 border border-indigo-900/50 px-3 py-1 rounded-full">Niveau {pal.level}</span>
+              {isLucky && <span className="text-xs font-mono text-purple-400 font-extrabold bg-purple-950 border border-purple-900 px-3 py-1 rounded-full">LUCKY</span>}
+              {isBoss && <span className="text-xs font-mono text-amber-400 font-extrabold bg-amber-950 border border-amber-900 px-3 py-1 rounded-full">BOSS</span>}
+            </div>
+            <h3 className="text-3xl font-black tracking-tight text-white truncate">{displayName}</h3>
+          </div>
+        </div>
         
-        {/* Bouton de fermeture */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors bg-slate-950/50 p-2 rounded-full border border-slate-800"
-        >
-          ✕
-        </button>
-
-        {/* En-tête */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-mono text-indigo-400 font-extrabold uppercase bg-indigo-950/50 border border-indigo-900/50 px-2.5 py-0.5 rounded-full">
-              Niv. {pal.level}
-            </span>
-            {isLucky && <span className="text-[11px] font-mono text-purple-400 font-extrabold bg-purple-950 border border-purple-900 px-2 py-0.5 rounded-full">LUCKY</span>}
-            {isBoss && <span className="text-[11px] font-mono text-amber-400 font-extrabold bg-amber-950 border border-amber-900 px-2 py-0.5 rounded-full">BOSS</span>}
-          </div>
-          <h3 className="text-2xl font-black tracking-tight text-white">{pal.name || pal.type}</h3>
-          {pal.name !== pal.type && (
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">{pal.type}</p>
-          )}
-        </div>
-
-        {/* Statistiques de Base de l'espèce */}
-        <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 mb-6 space-y-3">
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Statistiques de Base de l'espèce (Sans niveau)</h4>
-          
-          {/* PV de base */}
+        <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 mb-6 space-y-4">
+          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Statistiques de Base</h4>
           <div>
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>PV de base</span>
-              <span className="font-bold text-slate-200">{baseHp || "Inconnu"}</span>
-            </div>
-            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-emerald-500 h-full rounded-full" style={{ width: baseHp ? `${Math.min((baseHp / 200) * 100, 100)}%` : '0%' }}></div>
-            </div>
+            <div className="flex justify-between text-sm text-slate-400 mb-1.5"><span>PV de base</span><span className="font-bold text-slate-200">{baseHp || "Inconnu"}</span></div>
+            <div className="w-full bg-slate-850 h-3 rounded-full overflow-hidden"><div className="bg-emerald-500 h-full" style={{ width: baseHp ? `${Math.min((baseHp / 200) * 100, 100)}%` : '0%' }}></div></div>
           </div>
-
-          {/* Attaque de base */}
           <div>
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Attaque de base</span>
-              <span className="font-bold text-slate-200">{baseAttack || "Inconnu"}</span>
-            </div>
-            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-red-500 h-full rounded-full" style={{ width: baseAttack ? `${Math.min((baseAttack / 200) * 100, 100)}%` : '0%' }}></div>
-            </div>
-          </div>
-
-          {/* Défense de base */}
-          <div>
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Défense de base</span>
-              <span className="font-bold text-slate-200">{baseDefense || "Inconnu"}</span>
-            </div>
-            <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden">
-              <div className="bg-blue-500 h-full rounded-full" style={{ width: baseDefense ? `${Math.min((baseDefense / 200) * 100, 100)}%` : '0%' }}></div>
-            </div>
+            <div className="flex justify-between text-sm text-slate-400 mb-1.5"><span>Attaque de base</span><span className="font-bold text-slate-200">{baseAttack || "Inconnu"}</span></div>
+            <div className="w-full bg-slate-850 h-3 rounded-full overflow-hidden"><div className="bg-red-500 h-full" style={{ width: baseAttack ? `${Math.min((baseAttack / 200) * 100, 100)}%` : '0%' }}></div></div>
           </div>
         </div>
-
-        {/* Aptitudes au travail */}
-        <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 space-y-3">
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-850 pb-2">Aptitudes de travail</h4>
-          {pal.work_suitabilities && pal.work_suitabilities.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {pal.work_suitabilities.map((suitability, index) => {
-                const spec = WORK_TRANSLATIONS[suitability.suitability] || { name: suitability.suitability, color: "text-slate-300 bg-slate-900 border-slate-800" };
-                return (
-                  <div 
-                    key={index} 
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-2 ${spec.color}`}
-                  >
-                    <span>{spec.name}</span>
-                    <span className="bg-black/30 px-1.5 py-0.5 rounded font-black">Lvl {suitability.level}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500 italic py-2">Ce Pal ne possède aucune aptitude spécifique.</p>
-          )}
-        </div>
-
       </div>
     </div>
   );
@@ -140,222 +74,99 @@ function PalDetailsModal({ pal, onClose }) {
 // ==========================================
 // COMPOSANT : CARTE INDIVIDUELLE DU JOUEUR
 // ==========================================
-function PlayerCard({ player, onSelectPal }) {
+function PlayerCard({ player, onSelectPal, filters, getPalNameAndIcon }) {
   const [isOpen, setIsOpen] = useState(false);
   const [palSearch, setPalSearch] = useState("");
   const [pinnedPalIds, setPinnedPalIds] = useState([]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`pinned_pals_${player.uid}`);
-    if (saved) {
-      try {
-        setPinnedPalIds(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
-      }
-    }
+    if (saved) { try { setPinnedPalIds(JSON.parse(saved)); } catch (e) {} }
   }, [player.uid]);
 
   const togglePinPal = (e, palUniqueKey) => {
     e.stopPropagation();
-    let updated;
-    if (pinnedPalIds.includes(palUniqueKey)) {
-      updated = pinnedPalIds.filter(id => id !== palUniqueKey);
-    } else {
-      if (pinnedPalIds.length >= 5) return;
-      updated = [...pinnedPalIds, palUniqueKey];
-    }
+    const updated = pinnedPalIds.includes(palUniqueKey) ? pinnedPalIds.filter(id => id !== palUniqueKey) : [...pinnedPalIds, palUniqueKey];
     setPinnedPalIds(updated);
     localStorage.setItem(`pinned_pals_${player.uid}`, JSON.stringify(updated));
   };
 
   const sortedPals = [...(player.pals || [])].sort((a, b) => (b.level || 0) - (a.level || 0));
 
-  const palsWithKeys = sortedPals.map((pal, idx) => ({
-    ...pal,
-    uniqueKey: `${pal.type}_${pal.level}_${idx}`
-  }));
-
-  const pinnedPals = palsWithKeys.filter(pal => pinnedPalIds.includes(pal.uniqueKey));
-  const activeTeam = pinnedPals.length > 0 ? pinnedPals : palsWithKeys.slice(0, 5);
-
-  const activeKeys = activeTeam.map(p => p.uniqueKey);
-  const palbox = palsWithKeys.filter(pal => !activeKeys.includes(pal.uniqueKey));
-
-  const filteredPalbox = palbox.filter(pal => {
-    const name = pal.name || pal.type || "";
-    return name.toLowerCase().includes(palSearch.toLowerCase());
+  const palsWithKeys = sortedPals.map((pal, idx) => {
+    const { displayName, iconUrl } = getPalNameAndIcon(pal.type, pal.name);
+    return { ...pal, displayName, iconUrl, uniqueKey: `${pal.type}_${pal.level}_${idx}` };
   });
 
+  const filteredAllPals = palsWithKeys.filter(pal => {
+    return pal.displayName.toLowerCase().includes(filters.palSearchQuery.toLowerCase()) ||
+           (pal.type || "").toLowerCase().includes(filters.palSearchQuery.toLowerCase());
+  });
+
+  const pinnedPals = filteredAllPals.filter(pal => pinnedPalIds.includes(pal.uniqueKey));
+  const activeTeam = pinnedPals.length > 0 ? pinnedPals : filteredAllPals.slice(0, 5);
+  const activeKeys = activeTeam.map(p => p.uniqueKey);
+  const palbox = filteredAllPals.filter(pal => !activeKeys.includes(pal.uniqueKey));
+
+  const filteredPalbox = palbox.filter(pal => 
+    pal.displayName.toLowerCase().includes(palSearch.toLowerCase())
+  );
+
   return (
-    <div className="flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700/80 transition-all duration-300 backdrop-blur-md">
-      
-      {/* Infos Joueur */}
+    <div className="flex flex-col bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md">
       <div className="flex justify-between items-center mb-6">
-        <div className="min-w-0">
-          <h3 className="text-xl font-black text-white truncate tracking-wide" title={player.name}>
-            {player.name}
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 font-mono select-all">
-            UID: {player.uid}
-          </p>
+        <div>
+          <h3 className="text-xl font-black text-white truncate">{player.name}</h3>
+          <p className="text-xs text-slate-500 font-mono">UID: {player.uid}</p>
         </div>
-        <div className="flex-shrink-0">
-          <span className="px-3.5 py-1.5 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-400 border border-blue-500/30 text-xs font-black rounded-full uppercase tracking-widest shadow-inner">
-            Niv. {player.level}
-          </span>
-        </div>
+        <span className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-black rounded-full">Niv. {player.level}</span>
       </div>
 
-      {/* Équipe active */}
-      <div className="pt-4 border-t border-slate-800/60">
-        <div className="flex justify-between items-center mb-3">
-          <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-            {pinnedPals.length > 0 ? "Équipe Épinglée" : "Top 5 Niveaux"}
-          </h4>
-          <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md font-mono border border-slate-800">
-            {activeTeam.length}/5
-          </span>
-        </div>
+      <div className="pt-5 border-t border-slate-800/60 space-y-3">
+        {activeTeam.map((pal) => {
+          const isBoss = pal.name?.includes("(Boss)") || pal.type?.includes("(Boss)") || pal.is_boss;
+          const isPinned = pinnedPalIds.includes(pal.uniqueKey);
+          const baseHp = getPureSpeciesStat(pal.hp, pal.level, true);
 
-        {activeTeam.length === 0 ? (
-          <p className="text-xs text-slate-600 italic py-2 text-center bg-slate-950/20 rounded-lg">
-            Aucun Pal dans la boîte.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {activeTeam.map((pal) => {
-              const hasNickname = pal.name && pal.name !== pal.type;
-              const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
-              const isLucky = pal.is_lucky || pal.name?.includes("LUCKY");
-              const isPinned = pinnedPalIds.includes(pal.uniqueKey);
-              
-              // Calcul des stats de base pures de l'espèce
-              const baseHp = getPureSpeciesStat(pal.hp, pal.level, true);
-              const baseAttack = getPureSpeciesStat(pal.attack, pal.level, false);
-              const baseDefense = getPureSpeciesStat(pal.defense, pal.level, false);
-
-              return (
-                <div 
-                  key={pal.uniqueKey} 
-                  onClick={() => onSelectPal(pal)}
-                  className="flex flex-col bg-slate-950/40 hover:bg-slate-950/90 p-3 rounded-xl border border-slate-850 hover:border-indigo-500/30 transition-all duration-200 cursor-pointer group shadow-sm"
-                >
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <button 
-                        onClick={(e) => togglePinPal(e, pal.uniqueKey)}
-                        className="text-slate-600 hover:text-amber-400 transition-colors shrink-0 z-10"
-                        title={isPinned ? "Désépingler de l'équipe" : "Épingler dans l'équipe active"}
-                      >
-                        <span className={isPinned ? "text-amber-400 text-sm" : "text-slate-700 group-hover:text-slate-500 text-sm"}>★</span>
-                      </button>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className={`text-sm font-bold truncate ${isBoss ? 'text-amber-400' : isLucky ? 'text-purple-400' : 'text-slate-200 group-hover:text-white'}`}>
-                            {pal.name || pal.type}
-                          </p>
-                          {isLucky && <span className="text-[9px] px-1 bg-purple-950 text-purple-400 border border-purple-800 rounded font-black shrink-0">LUCKY</span>}
-                        </div>
-                        {hasNickname && (
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                            {pal.type}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded font-black font-mono border border-slate-700/50 shrink-0">
-                      Lvl {pal.level}
-                    </span>
+          return (
+            <div key={pal.uniqueKey} onClick={() => onSelectPal(pal)} className="flex items-center gap-4 bg-slate-950/40 hover:bg-slate-950/90 p-4 rounded-xl border border-slate-850 cursor-pointer group">
+              <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-xl p-1.5 shrink-0 flex items-center justify-center">
+                <img src={pal.iconUrl} alt={pal.displayName} className="w-full h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/img/unknown.webp'; }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button onClick={(e) => togglePinPal(e, pal.uniqueKey)} className="text-slate-600 hover:text-amber-400 text-base">
+                      {isPinned ? "★" : "☆"}
+                    </button>
+                    <p className={`text-base font-bold truncate ${isBoss ? 'text-amber-400' : 'text-slate-200'}`}>{pal.displayName}</p>
                   </div>
-
-                  {/* Statistiques de base pures */}
-                  {(baseHp || baseAttack || baseDefense) && (
-                    <div className="mt-2 pt-2 border-t border-slate-900/60 flex gap-4 text-[10px] font-mono text-slate-400">
-                      {baseHp && <span>PV Base: <strong className="text-slate-300">{baseHp}</strong></span>}
-                      {baseAttack && <span>ATK Base: <strong className="text-slate-300">{baseAttack}</strong></span>}
-                      {baseDefense && <span>DEF Base: <strong className="text-slate-300">{baseDefense}</strong></span>}
-                    </div>
-                  )}
+                  <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">Lvl {pal.level}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Palbox */}
-      {player.pals && player.pals.length > 5 && (
-        <div className="mt-4 pt-4 border-t border-slate-800/40">
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-950/50 hover:bg-slate-950 text-xs font-bold text-slate-300 rounded-xl border border-slate-850 hover:border-slate-800 transition-all"
-          >
-            <span className="flex items-center gap-2">
-              📦 Consulter la Palbox
-              <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px]">
-                {palbox.length} Pals
-              </span>
-            </span>
-            <svg 
-              className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-            </svg>
+      {filteredAllPals.length > 5 && (
+        <div className="mt-5 pt-4 border-t border-slate-800/40">
+          <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-4 py-3 bg-slate-950/50 hover:bg-slate-950 text-xs font-bold text-slate-300 rounded-xl border border-slate-850">
+            <span>📦 Reste de la Boîte ({palbox.length})</span>
+            <span className={`transform transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
           </button>
 
           {isOpen && (
-            <div className="mt-4 space-y-3 animate-fade-in">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Rechercher dans la boîte..."
-                  value={palSearch}
-                  onChange={(e) => setPalSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-850 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <svg className="absolute left-2.5 top-2.5 w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-
-              <div className="max-h-60 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                {filteredPalbox.length === 0 ? (
-                  <p className="text-center py-4 text-xs text-slate-600 italic">Aucun Pal trouvé.</p>
-                ) : (
-                  filteredPalbox.map((pal) => {
-                    const isBoss = pal.name?.startsWith("BOSS_") || pal.type?.startsWith("BOSS_") || pal.is_boss;
-                    return (
-                      <div 
-                        key={pal.uniqueKey} 
-                        onClick={() => onSelectPal(pal)}
-                        className="flex flex-col bg-slate-950/20 hover:bg-slate-950/50 p-2.5 rounded-lg border border-slate-900 text-xs cursor-pointer hover:border-slate-800 transition group"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <button 
-                              onClick={(e) => togglePinPal(e, pal.uniqueKey)}
-                              className="text-slate-800 hover:text-amber-450 transition-colors shrink-0 z-10"
-                              title="Épingler dans l'équipe active"
-                            >
-                              ★
-                            </button>
-                            <span className={`font-semibold truncate max-w-[120px] ${isBoss ? 'text-amber-500/90' : 'text-slate-400 group-hover:text-slate-200'}`}>
-                              {pal.name || pal.type}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-mono shrink-0">
-                            Niv. {pal.level}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+            <div className="mt-4 space-y-3">
+              <input type="text" placeholder="Rechercher..." value={palSearch} onChange={(e) => setPalSearch(e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-850 rounded-xl text-xs text-white" />
+              <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                {filteredPalbox.map((pal) => (
+                  <div key={pal.uniqueKey} onClick={() => onSelectPal(pal)} className="flex items-center gap-3 bg-slate-950/20 hover:bg-slate-950/50 p-2 rounded-xl border border-slate-900 text-xs cursor-pointer">
+                    <img src={pal.iconUrl} alt="" className="w-6 h-6 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/img/unknown.webp'; }} />
+                    <span className="truncate flex-1 text-slate-400">{pal.displayName}</span>
+                    <span className="font-mono text-slate-500">Niv.{pal.level}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -366,129 +177,85 @@ function PlayerCard({ player, onSelectPal }) {
 }
 
 // ==========================================
-// COMPOSANT PRINCIPAL : REGISTRE
+// COMPOSANT PRINCIPAL : REGISTRE COMPLET
 // ==========================================
 export default function PlayersPalsList() {
   const [players, setPlayers] = useState([]);
+  const [palTranslations, setPalTranslations] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPal, setSelectedPal] = useState(null);
+  const [selectedPal, setSelectedPal] = useState(null); // CORRECTION : Déclaration essentielle de selectedPal !
 
-  const fetchData = async () => {
-    try {
-      const response = await fetch("https://opal.lydecorp.fr/api/all-players-pals");
-      if (!response.ok) {
-        throw new Error("Impossible de récupérer les données du serveur.");
-      }
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      setPlayers(data.players || []);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [playerSearchQuery, setPlayerSearchQuery] = useState("");
+  const [palSearchQuery, setPalSearchQuery] = useState("");
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
+    fetch('/pals.json')
+      .then(res => res.json())
+      .then(data => setPalTranslations(data))
+      .catch(err => console.error("Erreur pals.json:", err));
   }, []);
 
-  const filteredPlayers = players.filter(player =>
-    player.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    fetch("https://opal.lydecorp.fr/api/all-players-pals")
+      .then(res => res.json())
+      .then(data => setPlayers(data.players || []))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[450px] text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
-        <p className="text-slate-400 font-medium">Chargement de la base de données...</p>
-      </div>
-    );
-  }
+  // RESOLUTION : LIAISON DIRECTE API -> DOSSIER IMAGES IMGMAPPING
+  const getPalNameAndIcon = (characterId, fallbackName) => {
+    const rawName = characterId || fallbackName || "Pal Inconnu";
+    
+    // 1. Nettoyer le suffixe " (Boss)" généré par ton API
+    let cleanName = rawName.replace(/\s*\(Boss\)/i, "").trim();
+    
+    // Le nom d'affichage final est le nom propre nettoyé
+    const displayName = cleanName;
 
-  if (error) {
-    return (
-      <div className="max-w-md mx-auto my-12 p-6 bg-red-950/40 border border-red-500/30 rounded-2xl text-white text-center backdrop-blur-sm">
-        <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-3">
-          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <h3 className="font-bold text-lg mb-1">Synchronisation impossible</h3>
-        <p className="text-sm text-red-300/85">{error}</p>
-        <button 
-          onClick={fetchData} 
-          className="mt-5 px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg"
-        >
-          Réessayer
-        </button>
-      </div>
-    );
-  }
+    // 2. Traitement du nom pour le dossier d'images (Tout en minuscules, gestion des espaces)
+    let imageName = cleanName.toLowerCase().replace(/\s+/g, "");
+
+    // 3. Mapping exact entre le nom Français/Anglique de l'API et ton dossier /public/img/
+    const apiToImageFile = {
+      "melpaca": "alpaca",
+      "kitsun": "amaterasuwolf",
+      "kitsunnoct": "amaterasuwolf_dark",
+      "fuddler": "badcatgirl",
+      "petallia": "lilyqueen",
+      "flopie": "flowerat",
+      "dumud": "lazycatfish",
+      "relaxaurus": "lazydragon",
+      "elphidran": "elfdragon",
+      "chillet": "chillet",
+      "anubis": "anubis",
+      "sekhmet": "sekhmet"
+    };
+
+    const finalImageName = apiToImageFile[imageName] || imageName;
+    const iconUrl = `/img/${finalImageName}.webp`;
+
+    return { displayName, iconUrl };
+  };
+
+  const filteredPlayers = players.filter(player => player.name.toLowerCase().includes(playerSearchQuery.toLowerCase()));
+
+  if (loading) return <div className="text-center text-white p-20">Chargement...</div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 text-white relative">
-      
-      {/* En-tête et Barre de recherche */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pb-6 border-b border-slate-800/80">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
-            Nos Joueurs & leurs Pals
-          </h2>
-          <p className="text-slate-400 text-sm mt-1.5 flex items-center gap-2">
-            <span className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-            Mise à jour en temps réel • <strong className="text-slate-200">{players.length}</strong> joueurs actifs
-          </p>
-          <p className="text-red-500 text-xs mt-1.5">
-            Les données sont encore en construction et peuvent contenir des erreurs. Merci de votre compréhension.
-          </p>
-        </div>
-        
-        <div className="relative w-full md:w-80">
-          <input
-            type="text"
-            placeholder="Rechercher un joueur..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-slate-500 transition-all"
-          />
-          <svg className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 py-8 text-white">
+      <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <input type="text" placeholder="Rechercher un Joueur..." value={playerSearchQuery} onChange={(e) => setPlayerSearchQuery(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl" />
+        <input type="text" placeholder="Rechercher un Pal..." value={palSearchQuery} onChange={(e) => setPalSearchQuery(e.target.value)} className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl" />
       </div>
 
-      {/* Grille des cartes Joueurs */}
-      {filteredPlayers.length === 0 ? (
-        <div className="text-center py-16 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
-          <p className="text-slate-500 text-lg">Aucun joueur ne correspond à votre recherche.</p>
-        </div>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start">
-          {filteredPlayers.map((player) => (
-            <PlayerCard 
-              key={player.uid} 
-              player={player} 
-              onSelectPal={(pal) => setSelectedPal(pal)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        {filteredPlayers.map((player) => (
+          <PlayerCard key={player.uid} player={player} filters={{ palSearchQuery }} onSelectPal={(pal) => setSelectedPal(pal)} getPalNameAndIcon={getPalNameAndIcon} />
+        ))}
+      </div>
 
-      {/* Affichage de la modale au clic d'un Pal */}
-      {selectedPal && (
-        <PalDetailsModal 
-          pal={selectedPal} 
-          onClose={() => setSelectedPal(null)} 
-        />
-      )}
+      {selectedPal && <PalDetailsModal pal={selectedPal} onClose={() => setSelectedPal(null)} getPalNameAndIcon={getPalNameAndIcon} />}
     </div>
   );
 }
